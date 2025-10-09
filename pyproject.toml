@@ -83,3 +83,15 @@ reportMissingModuleSource = "none" # -> most common: prettytable in mdp managers
 reportGeneralTypeIssues = "none"       # -> raises 218 errors (usage of literal MISSING in dataclasses)
 reportOptionalMemberAccess = "warning" # -> raises 8 errors
 reportPrivateUsage = "warning"
+
+# Add import roots so Pylance resolves runtime-only paths (Hydra/sys.path).
+# VS Code's python.analysis.extraPaths is ignored when [tool.pyright] exists,
+# so keep them here instead.
+extraPaths = [
+    "/local/home/hsajelian/IsaacLab/source",
+    "/local/home/hsajelian/IsaacLab/source/isaaclab",
+    "/local/home/hsajelian/IsaacLab/source/isaaclab_tasks",
+    "/local/home/hsajelian/IsaacLab/source/isaaclab_assets",
+    "/local/home/hsajelian/IsaacLab/source/isaaclab_rl",
+    "/local/home/hsajelian/IsaacLab_DMC/source/whole_body_tracking",
+]
