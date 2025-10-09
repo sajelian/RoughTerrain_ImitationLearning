@@ -29,7 +29,7 @@ the [motion_tracking_controller](https://github.com/HybridRobotics/motion_tracki
 
 ## Installation
 
-- Install Isaac Lab v2.1.0 by following
+- Install Isaac Lab v2.2.0 by following
   the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html). We recommend
   using the conda installation as it simplifies calling Python scripts from the terminal.
 
