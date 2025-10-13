@@ -59,6 +59,7 @@ class MySceneCfg(InteractiveSceneCfg):
     )
     # robots
     robot: ArticulationCfg = MISSING
+    viz_robot: ArticulationCfg | None = None
     # lights
     light = AssetBaseCfg(
         prim_path="/World/light",
