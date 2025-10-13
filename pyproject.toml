@@ -37,6 +37,7 @@ extra_standard_library = [
     "trimesh",
     "tqdm",
     "psutil",
+    "wandb",
 ]
 known_thirdparty = [
     "isaacsim.core.api",
@@ -93,5 +94,5 @@ extraPaths = [
     "/local/home/hsajelian/IsaacLab/source/isaaclab_tasks",
     "/local/home/hsajelian/IsaacLab/source/isaaclab_assets",
     "/local/home/hsajelian/IsaacLab/source/isaaclab_rl",
-    "/local/home/hsajelian/IsaacLab_DMC/source/whole_body_tracking",
+    "/local/home/hsajelian/RT_IL/source/whole_body_tracking",
 ]
