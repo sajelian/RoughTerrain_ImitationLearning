@@ -255,7 +255,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joi
                 motion_dof_vel,
             ),
             reset_flag,
-        ) = motion.get_next_state()
+        ) = motion.get_next_state()  # type: ignore
 
         # set root state
         root_states = robot.data.default_root_state.clone()
