@@ -92,7 +92,7 @@ from isaaclab.utils.io import dump_pickle, dump_yaml
 
 from isaaclab_rl.rsl_rl import RslRlBaseRunnerCfg, RslRlVecEnvWrapper
 
-import isaaclab_tasks  # noqa: F401
+import whole_body_tracking.tasks  # noqa: F401
 from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
