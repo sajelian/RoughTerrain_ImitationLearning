@@ -1,4 +1,4 @@
-"""Script to play a checkpoint if an RL agent from RSL-RL."""
+"""Evaluate learned Mimic Policy with reference motion visualization."""
 
 """Launch Isaac Sim Simulator first."""
 
@@ -59,6 +59,7 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 
 # Import extensions to set up environment tasks
 import whole_body_tracking.tasks  # noqa: F401
+from whole_body_tracking.tasks.tracking.mdp.commands import MotionCommand
 from whole_body_tracking.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
 
 
@@ -158,7 +159,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # unwrap
     scene = env.unwrapped.scene
     viz_robot = scene["viz_robot"]
-    motion_term = env.unwrapped.command_manager.get_term("motion")
+    motion_term: MotionCommand = env.unwrapped.command_manager.get_term("motion")  # type: ignore
 
     def _update_viz_robot():
         """Mirror the current motion command on the visualization robot."""

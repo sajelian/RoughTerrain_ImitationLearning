@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Script to train RL agent with RSL-RL."""
+"""Script to train mimic task agent."""
 
 """Launch Isaac Sim Simulator first."""
 

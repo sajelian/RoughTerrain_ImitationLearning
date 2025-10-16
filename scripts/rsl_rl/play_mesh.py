@@ -1,4 +1,5 @@
-"""Script to play a checkpoint if an RL agent from RSL-RL."""
+"""Use velocity task policy to traverse mesh terrain."""
+
 
 """Launch Isaac Sim Simulator first."""
 
@@ -18,6 +19,7 @@ parser.add_argument(
 )
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+parser.add_argument("--mesh_file", default="meshes/crater.stl", type=str, help="The name of the mesh file.")
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -43,6 +45,7 @@ from isaaclab.envs import DirectMARLEnv, multi_agent_to_single_agent
 from isaaclab.utils.dict import print_dict
 from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper, export_policy_as_jit, export_policy_as_onnx
 from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
+from isaaclab.scene import InteractiveScene
 
 # Import extensions to set up environment tasks
 import whole_body_tracking.tasks  # noqa: F401
@@ -115,6 +118,15 @@ def main():
     # reset environment
     obs = env.get_observations()
     timestep = 0
+
+    # custom terrain
+    import trimesh
+    mesh = trimesh.load_mesh(args_cli.mesh_file)
+    # scale down mesh
+    mesh.apply_scale(0.010)
+    mesh.apply_translation((0, -0.9, -0.075))
+    scene = env.unwrapped.scene
+    scene.terrain.import_mesh("crater", mesh)
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode

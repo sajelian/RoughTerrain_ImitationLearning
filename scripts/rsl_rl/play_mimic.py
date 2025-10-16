@@ -1,4 +1,4 @@
-"""Script to play a checkpoint if an RL agent from RSL-RL."""
+"""Evaluate learned Mimic Policy."""
 
 """Launch Isaac Sim Simulator first."""
 
