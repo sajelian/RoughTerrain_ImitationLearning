@@ -42,13 +42,12 @@ class G1MeshTerrainCfg(G1RoughEnvCfg_PLAY):
         # reduce the number of terrains to save memory
         self.scene.terrain = ground
         self.curriculum = None
-        self.scene.robot.init_state.pos = (-1.5, -0.7, 0.76)
-        self.scene.robot.init_state.rot = (1.0, 0.0, 0.0, 0.0)  # facing x direction
 
         self.commands.base_velocity.ranges.lin_vel_x = (1.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)  # this will not be used if heading_command is True
         self.commands.base_velocity.ranges.heading = (0.0, 0.0)  # walk toward x direction
+        self.commands.base_velocity.rel_standing_envs = 0.0
 
         self.events.reset_base.params = {  # robot should always spawn determinstically, otherwise alignment with terrain is hard
             "pose_range": {"x": (0.0, 0.0), "y": (0.0, 0.0), "yaw": (0.0, 0.0)},

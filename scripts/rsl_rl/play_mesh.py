@@ -20,6 +20,7 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--mesh_file", default="meshes/crater.stl", type=str, help="The name of the mesh file.")
+
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -49,6 +50,8 @@ from isaaclab.scene import InteractiveScene
 
 # Import extensions to set up environment tasks
 import whole_body_tracking.tasks  # noqa: F401
+
+import trimesh
 
 
 def main():
@@ -118,15 +121,21 @@ def main():
     # reset environment
     obs = env.get_observations()
     timestep = 0
-
-    # custom terrain
-    import trimesh
-    mesh = trimesh.load_mesh(args_cli.mesh_file)
-    # scale down mesh
-    mesh.apply_scale(0.010)
-    mesh.apply_translation((0, -0.9, -0.075))
     scene = env.unwrapped.scene
-    scene.terrain.import_mesh("crater", mesh)
+
+    # Meshinger
+    meshes = [trimesh.load_mesh(args_cli.mesh_file) for _ in range(env.num_envs)]
+    for i, mesh in enumerate(meshes):  # seems pretty slow, but only done once
+        mesh.apply_scale(0.010)
+        t = scene.env_origins[i].cpu().numpy()
+        # TODO these numbers are mesh specific. how will we handle this with the real data? Do we care about centering?
+        # probably not because the motion will include the robot going to the correct starting point either way
+        t[0] += 0.8
+        t[1] -= 0.215
+        t[2] = -0.075
+        mesh.apply_translation(t)
+        scene.terrain.import_mesh(f"mesh_{i}", mesh)  # the crater index is not matching the env index, do we care?
+
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode

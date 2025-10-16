@@ -9,7 +9,6 @@ from isaaclab.app import AppLauncher
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Replay converted motions.")
 parser.add_argument("--mesh_file", default="meshes/crater.stl", type=str, help="The name of the mesh file.")
-parser.add_argument("--num_envs", default=1, type=int, help="The number of environments.")
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)

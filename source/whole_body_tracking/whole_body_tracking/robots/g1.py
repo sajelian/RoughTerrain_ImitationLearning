@@ -184,6 +184,7 @@ G1_CYLINDER_CFG = ArticulationCfg(
 G1_VIZ_CFG = G1_CYLINDER_CFG.replace(spawn=G1_CYLINDER_CFG.spawn.replace(asset_path=f"{ASSET_DIR}/unitree_description/urdf/g1/viz_robot.urdf"))
 # also disable gravity
 G1_VIZ_CFG.spawn.rigid_props.disable_gravity = True
+# this doesnt work :( G1_VIZ_CFG.spawn.visual_material.opacity = 0.5
 
 
 G1_ACTION_SCALE = {}
