@@ -23,6 +23,34 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 
+def base_above_threshold(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    sensor_cfg: SceneEntityCfg | None = None,
+) -> torch.Tensor:
+    """Reward base height exceeding a target, with saturation to avoid large values and stop robot from targeting the specific value.
+
+    Note:
+        For flat terrain, target height is in the world frame. For rough terrain,
+        sensor readings can adjust the target height to account for the terrain.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject = env.scene[asset_cfg.name]
+    if sensor_cfg is not None:
+        sensor: RayCaster = env.scene[sensor_cfg.name]
+        # Adjust the target height using the sensor data
+        adjusted_threshold = threshold + torch.mean(
+            sensor.data.ray_hits_w[..., 2], dim=1
+        )
+    else:
+        # Use the provided target height directly for flat terrain
+        adjusted_threshold = threshold
+    # Reward for exceeding the target height, saturating with tanh to keep the reward bounded
+    height_diff = torch.clamp(asset.data.root_pos_w[:, 2] - adjusted_threshold, min=0.0)
+    return torch.tanh(height_diff)
+
+
 def feet_air_time(
     env: ManagerBasedRLEnv, command_name: str, sensor_cfg: SceneEntityCfg, threshold: float
 ) -> torch.Tensor:
