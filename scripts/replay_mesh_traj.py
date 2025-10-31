@@ -1,0 +1,154 @@
+"""Script to replay motion loaded from a wandb registry with mesh terrain.
+Example usage:
+python scripts/replay_mesh_traj.py --registry_name=sajelian-eth-zurich-org/wandb-registry-Motions/crater_correct_joints --mesh_file meshes/crater.stl --mesh_desc 0.8 -0.215 -0.05 0.01
+"""
+
+"""Launch Isaac Sim Simulator first."""
+
+import argparse
+import numpy as np
+import torch
+
+from isaaclab.app import AppLauncher
+
+# add argparse arguments
+parser = argparse.ArgumentParser(description="Replay converted motions.")
+parser.add_argument("--registry_name", type=str, required=True, help="The name of the wand registry.")
+parser.add_argument("--mesh_file", default="meshes/crater.stl", type=str, help="The name of the mesh file.")
+parser.add_argument("--mesh_desc", default=[0.0, 0.0, 0.0, 1.0], nargs="+", type=float, help="Mesh position and scale (x,y,z,scale).")
+
+
+# append AppLauncher cli args
+AppLauncher.add_app_launcher_args(parser)
+# parse the arguments
+args_cli = parser.parse_args()
+
+# launch omniverse app
+app_launcher = AppLauncher(args_cli)
+simulation_app = app_launcher.app
+
+"""Rest everything follows."""
+
+import isaaclab.sim as sim_utils
+from isaaclab.assets import Articulation, ArticulationCfg, AssetBaseCfg
+from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
+from isaaclab.sim import SimulationContext
+from isaaclab.utils import configclass
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
+
+##
+# Pre-defined configs
+##
+from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
+from whole_body_tracking.tasks.tracking.mdp import MotionLoader
+import trimesh
+from isaaclab.terrains import TerrainImporterCfg
+
+@configclass
+class ReplayMotionsSceneCfg(InteractiveSceneCfg):
+    """Configuration for a replay motions scene."""
+
+    ground = TerrainImporterCfg(
+        prim_path="/World/ground",
+        terrain_type="plane",
+        collision_group=-1,
+        physics_material=sim_utils.RigidBodyMaterialCfg(
+            friction_combine_mode="multiply",
+            restitution_combine_mode="multiply",
+            static_friction=1.0,
+            dynamic_friction=1.0,
+        ),
+        visual_material=sim_utils.MdlFileCfg(
+            mdl_path="{NVIDIA_NUCLEUS_DIR}/Materials/Base/Architecture/Shingles_01.mdl",
+            project_uvw=True,
+        ),
+    )
+
+    sky_light = AssetBaseCfg(
+        prim_path="/World/skyLight",
+        spawn=sim_utils.DomeLightCfg(
+            intensity=750.0,
+            texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
+        ),
+    )
+
+    # articulation
+    robot: ArticulationCfg = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+
+def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
+    # Extract scene entities
+    robot: Articulation = scene["robot"]
+    # Define simulation stepping
+    sim_dt = sim.get_physics_dt()
+
+    registry_name = args_cli.registry_name
+    if ":" not in registry_name:  # Check if the registry name includes alias, if not, append ":latest"
+        registry_name += ":latest"
+    import pathlib
+
+    import wandb
+
+    api = wandb.Api()
+    artifact = api.artifact(registry_name)
+    motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
+
+    motion = MotionLoader(
+        motion_file,
+        torch.tensor([0], dtype=torch.long, device=sim.device),
+        sim.device,
+    )
+    time_steps = torch.zeros(scene.num_envs, dtype=torch.long, device=sim.device)
+
+    # Meshinger
+    meshes = [trimesh.load_mesh(args_cli.mesh_file) for _ in range(scene.num_envs)]
+    for i, mesh in enumerate(meshes):  # seems pretty slow, but only done once
+        mesh.apply_scale(args_cli.mesh_desc[3])
+        t = scene.env_origins[i].cpu().numpy()
+        # TODO these numbers are mesh specific. how will we handle this with the real data? Do we care about centering?
+        # probably not because the motion will include the robot going to the correct starting point either way
+        t[0] += args_cli.mesh_desc[0]
+        t[1] += args_cli.mesh_desc[1]
+        t[2] += args_cli.mesh_desc[2]
+        mesh.apply_translation(t)
+        scene.terrain.import_mesh(f"mesh_{i}", mesh)  # the crater index is not matching the env index, do we care?
+
+    # Simulation loop
+    while simulation_app.is_running():
+        time_steps += 1
+        reset_ids = time_steps >= motion.time_step_total
+        time_steps[reset_ids] = 0
+
+        root_states = robot.data.default_root_state.clone()
+        root_states[:, :3] = motion.body_pos_w[time_steps][:, 0] + scene.env_origins[:, None, :]
+        root_states[:, 3:7] = motion.body_quat_w[time_steps][:, 0]
+        root_states[:, 7:10] = motion.body_lin_vel_w[time_steps][:, 0]
+        root_states[:, 10:] = motion.body_ang_vel_w[time_steps][:, 0]
+
+        robot.write_root_state_to_sim(root_states)
+        robot.write_joint_state_to_sim(motion.joint_pos[time_steps], motion.joint_vel[time_steps])
+        scene.write_data_to_sim()
+        sim.render()  # We don't want physic (sim.step())
+        scene.update(sim_dt)
+
+        pos_lookat = root_states[0, :3].cpu().numpy()
+        sim.set_camera_view(pos_lookat + np.array([2.0, 2.0, 0.5]), pos_lookat)
+
+
+def main():
+    sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
+    sim_cfg.dt = 0.02
+    sim = SimulationContext(sim_cfg)
+
+    scene_cfg = ReplayMotionsSceneCfg(num_envs=1, env_spacing=2.0)
+    scene = InteractiveScene(scene_cfg)
+    sim.reset()
+    # Run the simulator
+    run_simulator(sim, scene)
+
+
+if __name__ == "__main__":
+    # run the main function
+    main()
+    # close sim app
+    simulation_app.close()
