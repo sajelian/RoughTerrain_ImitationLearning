@@ -43,7 +43,7 @@ class G1MeshTerrainCfg(G1RoughEnvCfg_PLAY):
         self.scene.terrain = ground
         self.curriculum = None
 
-        self.commands.base_velocity.ranges.lin_vel_x = (1.0, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_x = (0.75, 0.75)
         self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)  # this will not be used if heading_command is True
         self.commands.base_velocity.ranges.heading = (0.0, 0.0)  # walk toward x direction
