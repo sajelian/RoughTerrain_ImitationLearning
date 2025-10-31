@@ -1,5 +1,7 @@
 """Use velocity task policy to traverse mesh terrain."""
-
+""" Example usage:
+python scripts/rsl_rl/play_mesh.py --task Isaac-Velocity-Mesh-G1-Play-v0  --load_run 2025-10-31_01-13-53 --checkpoint model_6000.pt --mesh_file meshes/crater.stl --mesh_desc 0.8 -0.215 -0.05 0.01 --headless
+"""
 
 """Launch Isaac Sim Simulator first."""
 
@@ -20,6 +22,7 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--mesh_file", default="meshes/crater.stl", type=str, help="The name of the mesh file.")
+parser.add_argument("--mesh_desc", default=[0.0, 0.0, 0.0, 1.0], nargs="+", type=float, help="Mesh position and scale.")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -126,13 +129,13 @@ def main():
     # Meshinger
     meshes = [trimesh.load_mesh(args_cli.mesh_file) for _ in range(env.num_envs)]
     for i, mesh in enumerate(meshes):  # seems pretty slow, but only done once
-        mesh.apply_scale(0.010)
+        mesh.apply_scale(args_cli.mesh_desc[3])
         t = scene.env_origins[i].cpu().numpy()
         # TODO these numbers are mesh specific. how will we handle this with the real data? Do we care about centering?
         # probably not because the motion will include the robot going to the correct starting point either way
-        t[0] += 0.8
-        t[1] -= 0.215
-        t[2] = -0.075
+        t[0] += args_cli.mesh_desc[0]
+        t[1] += args_cli.mesh_desc[1]
+        t[2] += args_cli.mesh_desc[2]
         mesh.apply_translation(t)
         scene.terrain.import_mesh(f"mesh_{i}", mesh)  # the crater index is not matching the env index, do we care?
 
