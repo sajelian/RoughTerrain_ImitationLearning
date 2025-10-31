@@ -99,7 +99,7 @@ class MotionCommand(CommandTerm):
 
     @property
     def command(self) -> torch.Tensor:  # TODO Consider again if this is the best observation
-        return torch.cat([self.joint_pos, self.joint_vel], dim=1)
+        return torch.cat([self.joint_pos, self.joint_vel], dim=1)  # no phase only joint pos and vel
 
     @property
     def joint_pos(self) -> torch.Tensor:
