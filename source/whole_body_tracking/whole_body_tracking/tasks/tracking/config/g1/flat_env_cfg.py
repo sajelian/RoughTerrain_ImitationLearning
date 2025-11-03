@@ -12,6 +12,7 @@ class G1FlatEnvCfg(TrackingEnvCfg):
         super().__post_init__()
 
         self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.env_spacing = 5.0
         self.actions.joint_pos.scale = G1_ACTION_SCALE
         self.commands.motion.anchor_body_name = "torso_link"
         self.commands.motion.body_names = [
@@ -55,3 +56,4 @@ class G1MimicFlatEnvCfg_PLAY(G1FlatEnvCfg):
         self.commands.motion.debug_vis = False
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
         # self.viewer.eye = (6.0, 6.0, 6.0)
+        # self.terminations = None # Could make sense

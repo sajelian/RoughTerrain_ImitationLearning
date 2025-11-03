@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Script to train mimic task agent on mesh terrain. # TODO implement terrain loading for all env instances(one terrain per robot)."""
+"""Script to train mimic task agent on mesh terrain."""
 
 """Launch Isaac Sim Simulator first."""
 
@@ -25,6 +25,8 @@ parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 parser.add_argument("--registry_name", type=str, required=True, help="The name of the wand registry.")
+parser.add_argument("--mesh_file", default="scripts/crater.stl", type=str, help="The name of the mesh file.")
+parser.add_argument("--mesh_desc", default=[0.0, 0.0, 0.0, 1.0], nargs="+", type=float, help="Mesh position and scale.")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -66,6 +68,9 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 # Import extensions to set up environment tasks
 import whole_body_tracking.tasks  # noqa: F401
 from whole_body_tracking.utils.my_on_policy_runner import MotionOnPolicyRunner as OnPolicyRunner
+import trimesh
+import logging
+
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
@@ -151,6 +156,22 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
+    # TODO load mesh that is associated with the motion, passed via CLI for now, later bundle!
+    scene = env.unwrapped.scene
+    # Meshinger
+    logging.info("Loading meshes into scene...")
+    meshes = [trimesh.load_mesh(args_cli.mesh_file) for _ in range(env.num_envs)]
+    for i, mesh in enumerate(meshes):  # TODO its fucking slow and also the memory gets exhausted by this type of mesh, how can we fix that?
+        mesh.apply_scale(args_cli.mesh_desc[3])
+        t = scene.env_origins[i].cpu().numpy()
+        # TODO these numbers are mesh specific. how will we handle this with the real data? Do we care about centering?
+        # probably not because the motion will include the robot going to the correct starting point either way
+        t[0] += args_cli.mesh_desc[0]
+        t[1] += args_cli.mesh_desc[1]
+        t[2] += args_cli.mesh_desc[2]
+        mesh.apply_translation(t)
+        scene.terrain.import_mesh(f"mesh_{i}", mesh)  # the mesh index is not matching the env index, do we care?
+    logging.info("Done loading meshes.")
     # run training
     runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
 

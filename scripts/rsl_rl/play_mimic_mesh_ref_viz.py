@@ -19,7 +19,7 @@ parser.add_argument(
 )
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-parser.add_argument("--motion_file", type=str, default=None, help="Path to the motion file.")
+parser.add_argument("--registry_name", type=str, required=True, help="The name of the wand registry.")
 parser.add_argument("--mesh_file", default="meshes/crater.stl", type=str, help="The name of the mesh file.")
 parser.add_argument("--mesh_desc", default=[0.0, 0.0, 0.0, 1.0], nargs="+", type=float, help="Mesh position and scale.")
 
@@ -114,6 +114,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
 
+    import wandb
+    api = wandb.Api()
+    artifact = api.artifact(args_cli.registry_name)
+    env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
+
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
@@ -178,6 +183,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     timestep = 0
 
     scene = env.unwrapped.scene
+    viz_robot = scene["viz_robot"]
+    motion_term: MotionCommand = env.unwrapped.command_manager.get_term("motion")  # type: ignore
 
     # Meshinger
     meshes = [trimesh.load_mesh(args_cli.mesh_file) for _ in range(env.num_envs)]
@@ -192,6 +199,17 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         mesh.apply_translation(t)
         scene.terrain.import_mesh(f"mesh_{i}", mesh)  # the crater index is not matching the env index, do we care?
 
+    def _update_viz_robot():
+        """Mirror the current motion command on the visualization robot."""
+        root_states = viz_robot.data.default_root_state.clone()
+        root_states[:, :3] = motion_term.body_pos_relative_w[:, 0]
+        root_states[:, 3:7] = motion_term.body_quat_relative_w[:, 0]
+        root_states[:, 7:10] = motion_term.body_lin_vel_w[:, 0]
+        root_states[:, 10:] = motion_term.body_ang_vel_w[:, 0]
+        viz_robot.write_root_state_to_sim(root_states)
+        viz_robot.write_joint_state_to_sim(motion_term.joint_pos.clone(), motion_term.joint_vel.clone())
+        scene.write_data_to_sim()
+
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
@@ -200,6 +218,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             actions = policy(obs)
             # env stepping
             obs, _, _, _ = env.step(actions)
+            _update_viz_robot()
         if args_cli.video:
             timestep += 1
             # Exit the play loop after recording one video
