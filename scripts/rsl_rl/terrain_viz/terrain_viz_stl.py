@@ -30,13 +30,12 @@ from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
 from isaaclab.sim import SimulationContext
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
-
-from isaaclab.sensors import RayCasterCfg, patterns
-
-
+from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.assets import ArticulationCfg
+
 from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
 
+import trimesh
 
 @configclass
 class TerrainVisualizationSceneCfg(InteractiveSceneCfg):
@@ -50,47 +49,23 @@ class TerrainVisualizationSceneCfg(InteractiveSceneCfg):
         ),
     )
 
-    ground = AssetBaseCfg(
+    ground = TerrainImporterCfg(
         prim_path="/World/ground",
-        init_state=AssetBaseCfg.InitialStateCfg(),
-        spawn=sim_utils.GroundPlaneCfg(),
+        terrain_type="plane",
         collision_group=-1,
-    )
-
-    obstacle = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/obstacle",
-        spawn=sim_utils.UsdFileCfg(
-            usd_path="meshes/step.usd"
+        physics_material=sim_utils.RigidBodyMaterialCfg(
+            friction_combine_mode="multiply",
+            restitution_combine_mode="multiply",
+            static_friction=1.0,
+            dynamic_friction=1.0,
         ),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0)),
-        collision_group=0
+        visual_material=sim_utils.MdlFileCfg(
+            mdl_path="{NVIDIA_NUCLEUS_DIR}/Materials/Base/Architecture/Shingles_01.mdl",
+            project_uvw=True,
+        ),
     )
 
     robot: ArticulationCfg = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-
-    height_scanner = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/torso_link",
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
-        ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=(1.6, 1.0)),
-        debug_vis=True,
-        mesh_prim_paths=["/World/envs/env_{i}/obstacle/geometry/mesh"]
-    )
-
-    def __post_init__(self):
-        """Post initialization."""
-        if self.height_scanner is None:
-            return
-
-        base_scanner = self.height_scanner
-        # disable the template scanner to avoid spawning it directly
-        self.height_scanner = None
-
-        for env_index in range(self.num_envs):
-            prim_path = base_scanner.prim_path.format(ENV_REGEX_NS=f"/World/envs/env_{env_index}")
-            mesh_paths = [path.format(i=env_index) for path in base_scanner.mesh_prim_paths]
-            env_scanner = base_scanner.replace(prim_path=prim_path, mesh_prim_paths=mesh_paths)
-            setattr(self, f"height_scanner_{env_index}", env_scanner)
 
 
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
@@ -111,6 +86,19 @@ def main():
 
     scene_cfg = TerrainVisualizationSceneCfg(num_envs=args_cli.num_envs, env_spacing=5.0)
     scene = InteractiveScene(scene_cfg)
+
+    # Meshinger
+    meshes = [trimesh.load_mesh(args_cli.mesh_file) for _ in range(scene_cfg.num_envs)]
+    for i, mesh in enumerate(meshes):  # seems pretty slow, but only done once
+        mesh.apply_scale(args_cli.mesh_desc[3])
+        t = scene.env_origins[i].cpu().numpy()
+        # TODO these numbers are mesh specific. how will we handle this with the real data? Do we care about centering?
+        # probably not because the motion will include the robot going to the correct starting point either way
+        t[0] += args_cli.mesh_desc[0]
+        t[1] += args_cli.mesh_desc[1]
+        t[2] += args_cli.mesh_desc[2]
+        mesh.apply_translation(t)
+        scene.terrain.import_mesh(f"mesh_{i}", mesh)  # the crater index is not matching the env index, do we care?
 
     # Run the simulator
     sim.reset()
