@@ -1,6 +1,6 @@
-"""Use velocity task policy to traverse mesh terrain and collect data TODO implement data collection."""
+"""Use velocity task policy to traverse mesh terrain and collect data implement data collection."""
 """ Example usage:
-python scripts/rsl_rl/record_mesh_trajectory.py --task Isaac-Velocity-Mesh-G1-Play-v0  --load_run 2025-10-31_01-13-53 --checkpoint model_6000.pt --mesh_file meshes/crater.stl --mesh_desc 0.8 -0.215 -0.05 0.01 --motion_length 200 --headless"""
+python scripts/rsl_rl/record_mesh_trajectory.py --task Isaac-Velocity-Mesh-G1-Play-v0  --load_run 2025-10-31_01-13-53 --checkpoint model_6000.pt --motion_length 200 --headless"""
 """Launch Isaac Sim Simulator first."""
 
 import argparse
@@ -81,7 +81,6 @@ from isaaclab_rl.rsl_rl import (
     export_policy_as_onnx,
 )
 from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
-from isaaclab.scene import InteractiveScene
 
 # Import extensions to set up environment tasks
 import whole_body_tracking.tasks  # noqa: F401
@@ -166,15 +165,7 @@ def main():
         policy_nn, normalizer=normalizer, path=export_model_dir, filename="policy.onnx"
     )
 
-    # custom terrain (works only for single env, as we only need one for recording)
-    import trimesh
-
-    mesh = trimesh.load_mesh(args_cli.mesh_file)
-    # scale down mesh
-    mesh.apply_scale(args_cli.mesh_desc[3])
-    mesh.apply_translation(tuple(args_cli.mesh_desc[0:3]))
     scene = env.unwrapped.scene
-    scene.terrain.import_mesh("custom_mesh", mesh)
 
     # prepare logging
     log = {
@@ -186,7 +177,6 @@ def main():
     # reset environment
     obs = env.get_observations()
     robot = scene["robot"]
-    # robot_joint_indexes = robot.find_joints(joint_names, preserve_order=True)[0]
     data_joint_names = [
         "left_hip_pitch_joint",
         "left_hip_roll_joint",
@@ -224,8 +214,6 @@ def main():
     )
 
     timestep = 0
-
-    # TODO maybe bundle trajectory with mesh
 
     # simulate environment
     while simulation_app.is_running() and timestep < args_cli.motion_length:

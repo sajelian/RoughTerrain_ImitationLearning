@@ -75,7 +75,7 @@ class TerrainVisualizationSceneCfg(InteractiveSceneCfg):
 
     obstacle = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/obstacle",
-        spawn=sim_utils.UsdFileCfg(usd_path=f"{args_cli.usd_file}"),
+        spawn=sim_utils.UsdFileCfg(usd_path="meshes/step.usd", scale=(1.0, 3.0, 1.0)),
         init_state=AssetBaseCfg.InitialStateCfg(pos=(-0.2, 0.0, 0.0)),
         collision_group=0,
     )
