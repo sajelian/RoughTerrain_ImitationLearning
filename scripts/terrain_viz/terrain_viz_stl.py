@@ -1,6 +1,6 @@
 """ Helper script to visualize terrains in Isaac Sim and adapt positions according to robot.
     Example usage: python scripts/terrain_viz.py --num_envs 1 --mesh_file meshes/crater.stl
-    python scripts/terrain_viz.py --mesh_file meshes/step.stl --mesh_desc 2.0 0.2 0.0 0.035 --num_envs=2
+    python scripts/terrain_viz/terrain_viz_stl.py --mesh_file meshes/step.stl --mesh_desc 2.0 0.2 0.0 0.035 --num_envs=2
 """
 
 """Launch Isaac Sim Simulator first."""
@@ -9,7 +9,7 @@ import argparse
 from isaaclab.app import AppLauncher
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Replay converted motions.")
-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
+parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
 parser.add_argument("--mesh_file", default="meshes/crater.stl", type=str, help="The name of the mesh file.")
 parser.add_argument("--mesh_desc", default=[0.0, 0.0, 0.0, 1.0], nargs="+", type=float, help="Mesh position and scale.")
 
