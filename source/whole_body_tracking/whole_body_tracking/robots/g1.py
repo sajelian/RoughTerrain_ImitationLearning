@@ -183,6 +183,7 @@ G1_CYLINDER_CFG = ArticulationCfg(
 # replace urdf
 G1_VIZ_CFG = G1_CYLINDER_CFG.replace(spawn=G1_CYLINDER_CFG.spawn.replace(asset_path=f"{ASSET_DIR}/unitree_description/urdf/g1/viz_robot.urdf"))
 # also disable gravity
+G1_VIZ_CFG.spawn.collision_props = sim_utils.schemas.CollisionPropertiesCfg(collision_enabled=False)
 G1_VIZ_CFG.spawn.rigid_props.disable_gravity = True
 # this doesnt work :( G1_VIZ_CFG.spawn.visual_material.opacity = 0.5
 
