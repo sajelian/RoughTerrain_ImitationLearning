@@ -1,10 +1,10 @@
 """Helper script to visualize terrains in Isaac Sim and adapt positions according to robot. Mesh must be in USD format.
-Example usage: python scripts/terrain_viz_usd_multi_ray.py --usd_file meshes/step.usd --num_envs=2
+Example usage: python scripts/terrain_viz/terrain_viz_usd_multi_ray.py --usd_file meshes/step.usd --num_envs=2
 """
 
 """Launch Isaac Sim Simulator first."""
 import argparse
-
+import yaml
 from isaaclab.app import AppLauncher
 
 # add argparse arguments
@@ -13,10 +13,10 @@ parser.add_argument(
     "--num_envs", type=int, default=None, help="Number of environments to simulate."
 )
 parser.add_argument(
-    "--usd_file",
-    default=None,
-    type=str,
-    help="The name of the usd file.",
+    "--usd_name", type=str, default=None, help="Name of the USD mesh."
+)
+parser.add_argument(
+    "--usd_path", type=str, default="source/whole_body_tracking/whole_body_tracking/assets/usd/", help="Path to the USD mesh files."
 )
 
 # append AppLauncher cli args
@@ -28,6 +28,14 @@ args_cli = parser.parse_args()
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
+# USD import and config
+usd_path = args_cli.usd_path + f"{args_cli.usd_name}" + ".usd"
+usd_cfg_path = args_cli.usd_path + "config/" + f"{args_cli.usd_name}" + ".yaml"
+
+# Fetch config from yaml
+with open(usd_cfg_path, "r") as f:
+    usd_cfg: dict = yaml.load(f, Loader=yaml.FullLoader)
+
 """Rest everything follows."""
 
 import isaaclab.sim as sim_utils
@@ -35,7 +43,7 @@ from isaaclab.assets import AssetBaseCfg
 from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
 from isaaclab.sim import SimulationContext
 from isaaclab.utils import configclass
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 
 from isaaclab.sensors import RayCasterCfg, MultiMeshRayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
@@ -47,7 +55,6 @@ from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
 @configclass
 class TerrainVisualizationSceneCfg(InteractiveSceneCfg):
     """Configuration for a terrain visualization scene."""
-
     sky_light = AssetBaseCfg(
         prim_path="/World/skyLight",
         spawn=sim_utils.DomeLightCfg(
@@ -68,16 +75,25 @@ class TerrainVisualizationSceneCfg(InteractiveSceneCfg):
             dynamic_friction=1.0,
         ),
         visual_material=sim_utils.MdlFileCfg(
-            mdl_path="{NVIDIA_NUCLEUS_DIR}/Materials/Base/Architecture/Shingles_01.mdl",
+            mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
             project_uvw=True,
+            texture_scale=(0.25, 0.25),
         ),
     )
 
     obstacle = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/obstacle",
-        spawn=sim_utils.UsdFileCfg(usd_path="meshes/step.usd", scale=(1.0, 3.0, 1.0)),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(-0.2, 0.0, 0.0)),
-        collision_group=0,
+        spawn=sim_utils.UsdFileCfg(
+            usd_path="",
+            scale=(1.0, 1.0, 1.0),
+            visual_material=sim_utils.MdlFileCfg(
+                mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
+                project_uvw=True,
+                texture_scale=(0.25, 0.25),
+            ),
+        ),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
+        collision_group=0,  # not really important
     )
 
     robot: ArticulationCfg = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
@@ -115,8 +131,21 @@ def main():
     sim_cfg.dt = 0.02
     sim = SimulationContext(sim_cfg)
     scene_cfg = TerrainVisualizationSceneCfg(
-        num_envs=args_cli.num_envs, env_spacing=5.0
+        num_envs=args_cli.num_envs,
+        env_spacing=5.0
     )
+
+    scene_cfg.obstacle = scene_cfg.obstacle.replace(
+        spawn=scene_cfg.obstacle.spawn.replace(
+            usd_path=usd_path,
+            scale=tuple(usd_cfg.get("scale", (1.0, 1.0, 1.0))),
+        ),
+        init_state=scene_cfg.obstacle.init_state.replace(
+            pos=tuple(usd_cfg.get("translation", (0.0, 0.0, 0.0))),
+            rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
+        ),
+    )
+
     scene = InteractiveScene(scene_cfg)
     # Run the simulator
     sim.reset()
