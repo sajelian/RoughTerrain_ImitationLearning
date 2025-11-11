@@ -4,15 +4,39 @@ from whole_body_tracking.robots.g1 import G1_ACTION_SCALE, G1_CYLINDER_CFG, G1_V
 from whole_body_tracking.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import LOW_FREQ_SCALE
 from whole_body_tracking.tasks.tracking.tracking_env_cfg import TrackingEnvCfg
 from whole_body_tracking.assets import ASSET_DIR
+from whole_body_tracking.tasks.velocity.config.g1.rough_env_cfg import G1RoughEnvCfg_PLAY
+
+from isaaclab.assets import AssetBaseCfg
+
+import isaaclab.sim as sim_utils
 
 
 @configclass
-class G1MeshEnvCfg(TrackingEnvCfg):  # TODO Implement this
+class G1MeshEnvCfg(TrackingEnvCfg):
+
+    obstacle = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/obstacle",
+        spawn=sim_utils.UsdFileCfg(
+            usd_path="",
+            scale=(1.0, 1.0, 1.0),
+            visual_material=sim_utils.materials.PreviewSurfaceCfg(
+                diffuse_color=(0.4, 0.4, 0.4),
+                emissive_color=(0.0, 0.0, 0.0),
+                roughness=0.5,
+                metallic=0.5,
+                opacity=1.0
+            )
+        ),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
+        collision_group=0,  # not really important
+    )
+
     def __post_init__(self):
         super().__post_init__()
 
         self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.actions.joint_pos.scale = G1_ACTION_SCALE
+        self.scene.env_spacing = 5.0
         self.commands.motion.anchor_body_name = "torso_link"
         self.commands.motion.body_names = [
             "pelvis",
@@ -31,11 +55,15 @@ class G1MeshEnvCfg(TrackingEnvCfg):  # TODO Implement this
             "right_wrist_yaw_link",
         ]
 
+        self.scene.obstacle = self.obstacle
+
 
 @configclass
-class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):  # TODO Implement this
+class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
     def __post_init__(self):
         super().__post_init__()
         self.commands.motion.debug_vis = False
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
         # self.viewer.eye = (6.0, 6.0, 6.0)
+
+    # TODO make robot motion always start at 0

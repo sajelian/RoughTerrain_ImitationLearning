@@ -11,6 +11,9 @@ class G1FlatEnvCfg(TrackingEnvCfg):
     def __post_init__(self):
         super().__post_init__()
 
+        self.scene.height_scanner = None
+        self.observations.policy.height_scan = None
+        self.observations.critic.height_scan = None
         self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.env_spacing = 5.0
         self.actions.joint_pos.scale = G1_ACTION_SCALE

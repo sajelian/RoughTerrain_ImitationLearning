@@ -5,6 +5,8 @@
 import argparse
 import sys
 
+import yaml
+
 from isaaclab.app import AppLauncher
 
 # local imports
@@ -22,7 +24,12 @@ parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--registry_name", type=str, required=True, help="The name of the wand registry.")
 parser.add_argument("--mesh_file", default="meshes/crater.stl", type=str, help="The name of the mesh file.")
 parser.add_argument("--mesh_desc", default=[0.0, 0.0, 0.0, 1.0], nargs="+", type=float, help="Mesh position and scale.")
-
+parser.add_argument(
+    "--usd_name", type=str, default=None, help="Name of the USD mesh."
+)
+parser.add_argument(
+    "--usd_path", type=str, default="source/whole_body_tracking/whole_body_tracking/assets/usd/", help="Path to the USD mesh files."
+)
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -38,6 +45,17 @@ sys.argv = [sys.argv[0]] + hydra_args
 # launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
+
+
+# USD import and config
+usd_path = args_cli.usd_path + f"{args_cli.usd_name}" + ".usd"
+usd_cfg_path = args_cli.usd_path + "config/" + f"{args_cli.usd_name}" + ".yaml"
+
+
+# Fetch config from yaml
+with open(usd_cfg_path, "r") as f:
+    usd_cfg: dict = yaml.load(f, Loader=yaml.FullLoader)
+
 
 """Rest everything follows."""
 
@@ -119,6 +137,18 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     artifact = api.artifact(args_cli.registry_name)
     env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
 
+    env_cfg.scene.obstacle = env_cfg.scene.obstacle.replace(
+        spawn=env_cfg.scene.obstacle.spawn.replace(
+            usd_path=usd_path,
+            scale=tuple(usd_cfg.get("scale", (1.0, 1.0, 1.0))),
+        ),
+        init_state=env_cfg.scene.obstacle.init_state.replace(
+            pos=tuple(usd_cfg.get("translation", (0.0, 0.0, 0.0))),
+            rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
+        ),
+    )
+
+
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
@@ -183,21 +213,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     timestep = 0
 
     scene = env.unwrapped.scene
-    viz_robot = scene["viz_robot"]
+    viz_robot = scene["viz_robot"] # TODO check if this robot is not affected by physics!
     motion_term: MotionCommand = env.unwrapped.command_manager.get_term("motion")  # type: ignore
-
-    # Meshinger
-    meshes = [trimesh.load_mesh(args_cli.mesh_file) for _ in range(env.num_envs)]
-    for i, mesh in enumerate(meshes):  # seems pretty slow, but only done once
-        mesh.apply_scale(args_cli.mesh_desc[3])
-        t = scene.env_origins[i].cpu().numpy()
-        # TODO these numbers are mesh specific. how will we handle this with the real data? Do we care about centering?
-        # probably not because the motion will include the robot going to the correct starting point either way
-        t[0] += args_cli.mesh_desc[0]
-        t[1] += args_cli.mesh_desc[1]
-        t[2] += args_cli.mesh_desc[2]
-        mesh.apply_translation(t)
-        scene.terrain.import_mesh(f"mesh_{i}", mesh)  # the crater index is not matching the env index, do we care?
 
     def _update_viz_robot():
         """Mirror the current motion command on the visualization robot."""
