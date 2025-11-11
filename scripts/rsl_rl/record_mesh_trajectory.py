@@ -1,6 +1,6 @@
 """Use velocity task policy to traverse mesh terrain and collect data implement data collection."""
 """ Example usage:
-python scripts/rsl_rl/record_mesh_trajectory.py --task Isaac-Velocity-Mesh-G1-Play-v0  --load_run 2025-10-31_01-13-53 --checkpoint model_6000.pt --motion_length 200 --headless"""
+python scripts/rsl_rl/record_mesh_trajectory.py --task Isaac-Velocity-Mesh-G1-Play-v0  --load_run 2025-10-31_01-13-53 --checkpoint model_6000.pt --motion_length 200 --usd_name step --headless"""
 """Launch Isaac Sim Simulator first."""
 
 import argparse
