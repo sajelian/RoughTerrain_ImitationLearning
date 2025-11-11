@@ -210,7 +210,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     timestep = 0
 
     scene = env.unwrapped.scene
-    viz_robot = scene["viz_robot"] # TODO check if this robot is not affected by physics!
+    viz_robot = scene["viz_robot"]
     motion_term: MotionCommand = env.unwrapped.command_manager.get_term("motion")  # type: ignore
 
     def _update_viz_robot():

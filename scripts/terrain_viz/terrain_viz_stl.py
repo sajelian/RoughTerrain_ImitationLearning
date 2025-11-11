@@ -92,8 +92,6 @@ def main():
     for i, mesh in enumerate(meshes):  # seems pretty slow, but only done once
         mesh.apply_scale(args_cli.mesh_desc[3])
         t = scene.env_origins[i].cpu().numpy()
-        # TODO these numbers are mesh specific. how will we handle this with the real data? Do we care about centering?
-        # probably not because the motion will include the robot going to the correct starting point either way
         t[0] += args_cli.mesh_desc[0]
         t[1] += args_cli.mesh_desc[1]
         t[2] += args_cli.mesh_desc[2]
