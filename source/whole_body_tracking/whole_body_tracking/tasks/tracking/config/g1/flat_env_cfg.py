@@ -35,6 +35,8 @@ class G1FlatEnvCfg(TrackingEnvCfg):
             "right_wrist_yaw_link",
         ]
 
+        self.scene.obstacle = None
+
 
 @configclass
 class G1FlatWoStateEstimationEnvCfg(G1FlatEnvCfg):
