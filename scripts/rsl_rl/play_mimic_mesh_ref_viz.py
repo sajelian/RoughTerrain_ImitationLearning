@@ -216,8 +216,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     def _update_viz_robot():
         """Mirror the current motion command on the visualization robot."""
         root_states = viz_robot.data.default_root_state.clone()
-        root_states[:, :3] = motion_term.body_pos_relative_w[:, 0]
-        root_states[:, 3:7] = motion_term.body_quat_relative_w[:, 0]
+        root_states[:, :3] = motion_term.body_pos_w[:, 0]
+        root_states[:, 3:7] = motion_term.body_quat_w[:, 0]
         root_states[:, 7:10] = motion_term.body_lin_vel_w[:, 0]
         root_states[:, 10:] = motion_term.body_ang_vel_w[:, 0]
         viz_robot.write_root_state_to_sim(root_states)

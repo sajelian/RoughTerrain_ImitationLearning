@@ -6,6 +6,17 @@ from whole_body_tracking.tasks.tracking.tracking_env_cfg import TrackingEnvCfg
 from isaaclab.assets import AssetBaseCfg
 
 import isaaclab.sim as sim_utils
+from whole_body_tracking.tasks.tracking.mdp.commands import MotionCommand
+
+
+class FixedStartMotionCommand(MotionCommand):
+    """Motion command variant that always restarts trajectories from the first frame."""
+
+    def _adaptive_sampling(self, env_ids):
+        if len(env_ids) == 0:
+            return
+
+        self.time_steps[env_ids] = 0
 
 
 @configclass
@@ -62,5 +73,5 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         self.commands.motion.debug_vis = False
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
         # self.viewer.eye = (6.0, 6.0, 6.0)
-
-    # TODO make robot motion always start at 0
+        self.commands.motion.class_type = FixedStartMotionCommand
+        self.terminations = None
