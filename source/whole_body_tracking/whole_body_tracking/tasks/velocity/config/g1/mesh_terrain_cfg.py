@@ -9,38 +9,27 @@ from whole_body_tracking.tasks.velocity.config.g1.rough_env_cfg import G1RoughEn
 
 from isaaclab.assets import AssetBaseCfg
 
-from isaaclab.sensors import RayCasterCfg, MultiMeshRayCasterCfg, patterns
-
 import isaaclab.sim as sim_utils
 
 
 @configclass
-class G1MeshTerrainCfg(G1RoughEnvCfg_PLAY):
+class G1MeshTerrainCfg_PLAY(G1RoughEnvCfg_PLAY):
 
     obstacle = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/obstacle",  # TODO make this cli arg
+        prim_path="{ENV_REGEX_NS}/obstacle",
         spawn=sim_utils.UsdFileCfg(
-            usd_path="meshes/step.usd",
-            scale=(1.0, 3.0, 1.0)
+            usd_path="",
+            scale=(1.0, 1.0, 1.0),
+            visual_material=sim_utils.materials.PreviewSurfaceCfg(
+                diffuse_color=(0.4, 0.4, 0.4),
+                emissive_color=(0.0, 0.0, 0.0),
+                roughness=0.5,
+                metallic=0.5,
+                opacity=1.0
+            )
         ),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(-0.25, -0.25, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
-        collision_group=0
-    )
-
-    height_scanner = MultiMeshRayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/torso_link",
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
-        ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=(1.6, 1.0)),
-        debug_vis=True,
-        mesh_prim_paths=[
-            "/World/ground",
-            MultiMeshRayCasterCfg.RaycastTargetCfg(
-                target_prim_expr="{ENV_REGEX_NS}/obstacle",
-                is_shared=True,
-                track_mesh_transforms=False,
-            ),
-        ],
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
+        collision_group=0,  # not really important
     )
 
     def __post_init__(self):
@@ -48,7 +37,6 @@ class G1MeshTerrainCfg(G1RoughEnvCfg_PLAY):
         super().__post_init__()
 
         self.scene.obstacle = self.obstacle
-        self.scene.height_scanner = self.height_scanner
 
         # make a smaller scene for play
         self.scene.num_envs = 1

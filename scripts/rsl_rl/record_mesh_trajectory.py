@@ -5,6 +5,8 @@ python scripts/rsl_rl/record_mesh_trajectory.py --task Isaac-Velocity-Mesh-G1-Pl
 
 import argparse
 
+import yaml
+
 from isaaclab.app import AppLauncher
 
 # local imports
@@ -38,18 +40,12 @@ parser.add_argument(
 )
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
-    "--mesh_file",
-    default="scripts/crater.stl",
-    type=str,
-    help="The name of the mesh file.",
+    "--usd_name", type=str, default=None, help="Name of the USD mesh."
 )
 parser.add_argument(
-    "--mesh_desc",
-    default=[0.0, 0.0, 0.0, 1.0],
-    nargs="+",
-    type=float,
-    help="Mesh position and scale.",
+    "--usd_path", type=str, default="source/whole_body_tracking/whole_body_tracking/assets/usd/", help="Path to the USD mesh files."
 )
+
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -62,6 +58,14 @@ if args_cli.video:
 # launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
+
+# USD import and config
+usd_path = args_cli.usd_path + f"{args_cli.usd_name}" + ".usd"
+usd_cfg_path = args_cli.usd_path + "config/" + f"{args_cli.usd_name}" + ".yaml"
+
+# Fetch config from yaml
+with open(usd_cfg_path, "r") as f:
+    usd_cfg: dict = yaml.load(f, Loader=yaml.FullLoader)
 
 """Rest everything follows."""
 
@@ -97,6 +101,17 @@ def main():
     )
     agent_cfg: RslRlOnPolicyRunnerCfg = cli_args.parse_rsl_rl_cfg(
         args_cli.task, args_cli
+    )
+
+    env_cfg.scene.obstacle = env_cfg.scene.obstacle.replace(
+        spawn=env_cfg.scene.obstacle.spawn.replace(
+            usd_path=usd_path,
+            scale=tuple(usd_cfg.get("scale", (1.0, 1.0, 1.0))),
+        ),
+        init_state=env_cfg.scene.obstacle.init_state.replace(
+            pos=tuple(usd_cfg.get("translation", (0.0, 0.0, 0.0))),
+            rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
+        ),
     )
 
     # specify directory for logging experiments

@@ -1,6 +1,6 @@
 """Script to replay motion loaded from a wandb registry with mesh terrain.
 Example usage:
-python scripts/replay_mesh_traj.py --registry_name=sajelian-eth-zurich-org/wandb-registry-Motions/crater_correct_joints
+python scripts/replay_mesh_traj.py --registry_name=sajelian-eth-zurich-org/wandb-registry-Motions/step_traversal
 """
 
 """Launch Isaac Sim Simulator first."""
@@ -8,13 +8,19 @@ python scripts/replay_mesh_traj.py --registry_name=sajelian-eth-zurich-org/wandb
 import argparse
 import numpy as np
 import torch
+import yaml
 
 from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Replay converted motions.")
 parser.add_argument("--registry_name", type=str, required=True, help="The name of the wand registry.")
-# TODO add usd cli args
+parser.add_argument(
+    "--usd_name", type=str, default=None, help="Name of the USD mesh."
+)
+parser.add_argument(
+    "--usd_path", type=str, default="source/whole_body_tracking/whole_body_tracking/assets/usd/", help="Path to the USD mesh files."
+)
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -24,6 +30,15 @@ args_cli = parser.parse_args()
 # launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
+
+# USD import and config
+usd_path = args_cli.usd_path + f"{args_cli.usd_name}" + ".usd"
+usd_cfg_path = args_cli.usd_path + "config/" + f"{args_cli.usd_name}" + ".yaml"
+
+
+# Fetch config from yaml
+with open(usd_cfg_path, "r") as f:
+    usd_cfg: dict = yaml.load(f, Loader=yaml.FullLoader)
 
 """Rest everything follows."""
 
@@ -39,8 +54,8 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 ##
 from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
 from whole_body_tracking.tasks.tracking.mdp import MotionLoader
-import trimesh
 from isaaclab.terrains import TerrainImporterCfg
+
 
 @configclass
 class ReplayMotionsSceneCfg(InteractiveSceneCfg):
@@ -63,13 +78,20 @@ class ReplayMotionsSceneCfg(InteractiveSceneCfg):
     )
 
     obstacle = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/obstacle",  # TODO make this cli arg
+        prim_path="{ENV_REGEX_NS}/obstacle",
         spawn=sim_utils.UsdFileCfg(
-            usd_path="meshes/step.usd",
-            scale=(1.0, 3.0, 1.0)
+            usd_path="",
+            scale=(1.0, 1.0, 1.0),
+            visual_material=sim_utils.materials.PreviewSurfaceCfg(
+                diffuse_color=(0.4, 0.4, 0.4),
+                emissive_color=(0.0, 0.0, 0.0),
+                roughness=0.5,
+                metallic=0.5,
+                opacity=1.0
+            )
         ),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(-0.25, -0.25, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
-        collision_group=0
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
+        collision_group=0,  # not really important
     )
 
     sky_light = AssetBaseCfg(
@@ -136,7 +158,20 @@ def main():
     sim = SimulationContext(sim_cfg)
 
     scene_cfg = ReplayMotionsSceneCfg(num_envs=1, env_spacing=2.0)
+
+    scene_cfg.obstacle = scene_cfg.obstacle.replace(
+        spawn=scene_cfg.obstacle.spawn.replace(
+            usd_path=usd_path,
+            scale=tuple(usd_cfg.get("scale", (1.0, 1.0, 1.0))),
+        ),
+        init_state=scene_cfg.obstacle.init_state.replace(
+            pos=tuple(usd_cfg.get("translation", (0.0, 0.0, 0.0))),
+            rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
+        ),
+    )
+
     scene = InteractiveScene(scene_cfg)
+
     sim.reset()
     # Run the simulator
     run_simulator(sim, scene)

@@ -46,7 +46,6 @@ sys.argv = [sys.argv[0]] + hydra_args
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-
 # USD import and config
 usd_path = args_cli.usd_path + f"{args_cli.usd_name}" + ".usd"
 usd_cfg_path = args_cli.usd_path + "config/" + f"{args_cli.usd_name}" + ".yaml"
@@ -81,7 +80,6 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 # Import extensions to set up environment tasks
 import whole_body_tracking.tasks  # noqa: F401
 from whole_body_tracking.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
-import trimesh
 
 
 @hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
@@ -147,7 +145,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
         ),
     )
-
 
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)

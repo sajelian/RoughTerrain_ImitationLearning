@@ -3,12 +3,16 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Script to train mimic task agent on mesh terrain."""
+"""Script to train mimic task agent on mesh terrain.
+python scripts/rsl_rl/train_mimic_mesh.py --registry_name=sajelian-eth-zurich-org/wandb-registry-Motions/step_traversal --task Tracking-Mesh-G1-v0 --num_envs 2048 --headless --video --video_interval 7500 --logger wandb --log_project_name DeepMimicClone
+"""
 
 """Launch Isaac Sim Simulator first."""
 
 import argparse
 import sys
+
+import yaml
 
 from isaaclab.app import AppLauncher
 
@@ -25,8 +29,12 @@ parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 parser.add_argument("--registry_name", type=str, required=True, help="The name of the wand registry.")
-parser.add_argument("--mesh_file", default="scripts/crater.stl", type=str, help="The name of the mesh file.")
-parser.add_argument("--mesh_desc", default=[0.0, 0.0, 0.0, 1.0], nargs="+", type=float, help="Mesh position and scale.")
+parser.add_argument(
+    "--usd_name", type=str, default=None, help="Name of the USD mesh."
+)
+parser.add_argument(
+    "--usd_path", type=str, default="source/whole_body_tracking/whole_body_tracking/assets/usd/", help="Path to the USD mesh files."
+)
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -45,6 +53,14 @@ sys.argv = [sys.argv[0]] + hydra_args
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
+# USD import and config
+usd_path = args_cli.usd_path + f"{args_cli.usd_name}" + ".usd"
+usd_cfg_path = args_cli.usd_path + "config/" + f"{args_cli.usd_name}" + ".yaml"
+
+# Fetch config from yaml
+with open(usd_cfg_path, "r") as f:
+    usd_cfg: dict = yaml.load(f, Loader=yaml.FullLoader)
+
 """Rest everything follows."""
 
 import gymnasium as gym
@@ -60,7 +76,7 @@ from isaaclab.envs import (
     multi_agent_to_single_agent,
 )
 from isaaclab.utils.dict import print_dict
-from isaaclab.utils.io import dump_pickle, dump_yaml
+from isaaclab.utils.io import dump_yaml
 from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
 from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
@@ -68,8 +84,6 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 # Import extensions to set up environment tasks
 import whole_body_tracking.tasks  # noqa: F401
 from whole_body_tracking.utils.my_on_policy_runner import MotionOnPolicyRunner as OnPolicyRunner
-import trimesh
-import logging
 
 
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -104,6 +118,18 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     api = wandb.Api()
     artifact = api.artifact(registry_name)
     env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
+
+    env_cfg.scene.obstacle = env_cfg.scene.obstacle.replace(
+        spawn=env_cfg.scene.obstacle.spawn.replace(
+            usd_path=usd_path,
+            scale=tuple(usd_cfg.get("scale", (1.0, 1.0, 1.0))),
+        ),
+        init_state=env_cfg.scene.obstacle.init_state.replace(
+            pos=tuple(usd_cfg.get("translation", (0.0, 0.0, 0.0))),
+            rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
+        ),
+    )
+
 
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
@@ -153,25 +179,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
-    dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
-    dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
-    # TODO load mesh that is associated with the motion, passed via CLI for now, later bundle!
-    scene = env.unwrapped.scene
-    # Meshinger
-    logging.info("Loading meshes into scene...")
-    meshes = [trimesh.load_mesh(args_cli.mesh_file) for _ in range(env.num_envs)]
-    for i, mesh in enumerate(meshes):  # TODO its fucking slow and also the memory gets exhausted by this type of mesh, how can we fix that?
-        mesh.apply_scale(args_cli.mesh_desc[3])
-        t = scene.env_origins[i].cpu().numpy()
-        # TODO these numbers are mesh specific. how will we handle this with the real data? Do we care about centering?
-        # probably not because the motion will include the robot going to the correct starting point either way
-        t[0] += args_cli.mesh_desc[0]
-        t[1] += args_cli.mesh_desc[1]
-        t[2] += args_cli.mesh_desc[2]
-        mesh.apply_translation(t)
-        scene.terrain.import_mesh(f"mesh_{i}", mesh)  # the mesh index is not matching the env index, do we care?
-    logging.info("Done loading meshes.")
     # run training
     runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
 
