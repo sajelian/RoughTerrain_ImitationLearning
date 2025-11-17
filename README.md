@@ -11,16 +11,17 @@
 [[Video]](https://youtu.be/RS_MtKVIAzY)
 
 ## Overview
+This repo implements the tracking of motions over rough terrain for a Unitree G1 Humanoid.
 
-BeyondMimic is a versatile humanoid control framework that provides highly dynamic motion tracking with the
+<!-- BeyondMimic is a versatile humanoid control framework that provides highly dynamic motion tracking with the
 state-of-the-art motion quality on real-world deployment and steerable test-time control with guided diffusion-based
-controllers.
+controllers. -->
 
-This repo covers the motion tracking training in BeyondMimic. **You should be able to
+<!-- This repo covers the motion tracking training in BeyondMimic. **You should be able to
 train any sim-to-real-ready motion in the LAFAN1 dataset, without tuning any parameters**.
 
 For sim-to-sim and sim-to-real deployment, please refer to
-the [motion_tracking_controller](https://github.com/HybridRobotics/motion_tracking_controller).
+the [motion_tracking_controller](https://github.com/HybridRobotics/motion_tracking_controller). -->
 
 ### Alternative Implementations
 
@@ -28,7 +29,7 @@ the [motion_tracking_controller](https://github.com/HybridRobotics/motion_tracki
 
 ## Installation
 
-- Install Isaac Lab v2.2.0 by following
+- Install Isaac Lab ~~v2.2.0~~ (wait for release version that includes MultiRayScanner) by following
   the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html). We recommend
   using the conda installation as it simplifies calling Python scripts from the terminal.
 
