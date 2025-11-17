@@ -7,12 +7,12 @@ version = "0.1.0"
 category = "isaaclab"
 readme  = "README.md"
 
-title = "Extension Template"
-author = "Isaac Lab Project Developers"
-maintainer = "Isaac Lab Project Developers"
-description="Extension Template for Isaac Lab"
-repository = "https://github.com/isaac-sim/IsaacLabExtensionTemplate.git"
-keywords = ["extension", "template", "isaaclab"]
+title = "RT_IL"
+author = "Haig Conti Georges Sajelian"
+maintainer = "Haig Conti Georges Sajelian"
+description="Pipeline for learning rough terrain traversal using imitation learning."
+repository = "https://github.com/sajelian/RT_IL^.git"
+keywords = ["extension", "locomotion", "isaaclab", "humanoid", "traversal"]
 
 [dependencies]
 "isaaclab" = {}
