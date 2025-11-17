@@ -7,10 +7,10 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils import configclass
 
-import whole_body_tracking.tasks.velocity.mdp as mdp
-from whole_body_tracking.tasks.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg, RewardsCfg
+import RT_IL.tasks.velocity.mdp as mdp
+from RT_IL.tasks.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg, RewardsCfg
 
-from whole_body_tracking.robots.g1 import G1_ACTION_SCALE, G1_CYLINDER_CFG, STIFFNESS_7520_14, DAMPING_7520_14, ARMATURE_7520_14
+from RT_IL.robots.g1 import G1_ACTION_SCALE, G1_CYLINDER_CFG, STIFFNESS_7520_14, DAMPING_7520_14, ARMATURE_7520_14
 
 
 @configclass

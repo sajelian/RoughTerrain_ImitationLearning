@@ -1,9 +1,9 @@
 from isaaclab.utils import configclass
 
-from whole_body_tracking.robots.g1 import G1_ACTION_SCALE, G1_CYLINDER_CFG, G1_VIZ_CFG
-from whole_body_tracking.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import LOW_FREQ_SCALE
-from whole_body_tracking.tasks.tracking.tracking_env_cfg import TrackingEnvCfg
-from whole_body_tracking.assets import ASSET_DIR
+from RT_IL.robots.g1 import G1_ACTION_SCALE, G1_CYLINDER_CFG, G1_VIZ_CFG
+from RT_IL.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import LOW_FREQ_SCALE
+from RT_IL.tasks.tracking.tracking_env_cfg import TrackingEnvCfg
+from RT_IL.assets import ASSET_DIR
 
 
 @configclass

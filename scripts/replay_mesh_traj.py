@@ -19,7 +19,7 @@ parser.add_argument(
     "--usd_name", type=str, default=None, help="Name of the USD mesh."
 )
 parser.add_argument(
-    "--usd_path", type=str, default="source/whole_body_tracking/whole_body_tracking/assets/usd/", help="Path to the USD mesh files."
+    "--usd_path", type=str, default="source/RT_IL/RT_IL/assets/usd/", help="Path to the USD mesh files."
 )
 
 # append AppLauncher cli args
@@ -52,8 +52,8 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 ##
 # Pre-defined configs
 ##
-from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
-from whole_body_tracking.tasks.tracking.mdp import MotionLoader
+from RT_IL.robots.g1 import G1_CYLINDER_CFG
+from RT_IL.tasks.tracking.mdp import MotionLoader
 from isaaclab.terrains import TerrainImporterCfg
 
 

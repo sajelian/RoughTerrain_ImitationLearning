@@ -1,9 +1,9 @@
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.utils import configclass
 
-from whole_body_tracking.assets import ASSET_DIR
-from whole_body_tracking.robots.smpl import SMPL_HUMANOID
-from whole_body_tracking.tasks.tracking.tracking_env_cfg import TrackingEnvCfg
+from RT_IL.assets import ASSET_DIR
+from RT_IL.robots.smpl import SMPL_HUMANOID
+from RT_IL.tasks.tracking.tracking_env_cfg import TrackingEnvCfg
 
 
 @configclass

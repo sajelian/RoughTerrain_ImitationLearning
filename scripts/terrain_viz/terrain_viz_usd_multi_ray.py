@@ -16,7 +16,7 @@ parser.add_argument(
     "--usd_name", type=str, default=None, help="Name of the USD mesh."
 )
 parser.add_argument(
-    "--usd_path", type=str, default="source/whole_body_tracking/whole_body_tracking/assets/usd/", help="Path to the USD mesh files."
+    "--usd_path", type=str, default="source/RT_IL/RT_IL/assets/usd/", help="Path to the USD mesh files."
 )
 
 # append AppLauncher cli args
@@ -49,7 +49,7 @@ from isaaclab.sensors import RayCasterCfg, MultiMeshRayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
 
 from isaaclab.assets import ArticulationCfg
-from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
+from RT_IL.robots.g1 import G1_CYLINDER_CFG
 
 
 @configclass

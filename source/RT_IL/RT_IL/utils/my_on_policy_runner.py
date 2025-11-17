@@ -6,7 +6,7 @@ from rsl_rl.runners import OnPolicyRunner
 from isaaclab_rl.rsl_rl import export_policy_as_onnx
 
 import wandb
-from whole_body_tracking.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
+from RT_IL.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
 
 
 class MyOnPolicyRunner(OnPolicyRunner):

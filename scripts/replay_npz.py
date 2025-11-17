@@ -3,7 +3,7 @@
 .. code-block:: bash
 
     # Usage
-    python replay_motion.py --motion_file source/whole_body_tracking/whole_body_tracking/assets/g1/motions/lafan_walk_short.npz
+    python replay_motion.py --motion_file source/RT_IL/RT_IL/assets/g1/motions/lafan_walk_short.npz
 """
 
 """Launch Isaac Sim Simulator first."""
@@ -39,8 +39,8 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 ##
 # Pre-defined configs
 ##
-from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
-from whole_body_tracking.tasks.tracking.mdp import MotionLoader
+from RT_IL.robots.g1 import G1_CYLINDER_CFG
+from RT_IL.tasks.tracking.mdp import MotionLoader
 
 
 @configclass

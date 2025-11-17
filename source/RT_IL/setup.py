@@ -1,4 +1,4 @@
-"""Installation script for the 'whole_body_tracking' python package."""
+"""Installation script for the 'RT_IL' python package."""
 
 import os
 import toml
@@ -19,8 +19,8 @@ INSTALL_REQUIRES = [
 
 # Installation operation
 setup(
-    name="whole_body_tracking",
-    packages=["whole_body_tracking"],
+    name="RT_IL",
+    packages=["RT_IL"],
     author=EXTENSION_TOML_DATA["package"]["author"],
     maintainer=EXTENSION_TOML_DATA["package"]["maintainer"],
     url=EXTENSION_TOML_DATA["package"]["repository"],

@@ -5,7 +5,7 @@
 
 from isaaclab.utils import configclass
 
-from whole_body_tracking.tasks.velocity.config.g1.rough_env_cfg import G1RoughEnvCfg_PLAY
+from RT_IL.tasks.velocity.config.g1.rough_env_cfg import G1RoughEnvCfg_PLAY
 
 from isaaclab.assets import AssetBaseCfg
 

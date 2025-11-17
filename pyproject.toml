@@ -57,7 +57,7 @@ known_isaaclabparty = [
 ]
 
 # Modify the following to include the package names of your first-party code
-known_firstparty = "whole_body_tracking"
+known_firstparty = "RT_IL"
 known_local_folder = "config"
 
 [tool.pyright]
@@ -94,5 +94,5 @@ extraPaths = [
     "/local/home/hsajelian/IsaacLab/source/isaaclab_tasks",
     "/local/home/hsajelian/IsaacLab/source/isaaclab_assets",
     "/local/home/hsajelian/IsaacLab/source/isaaclab_rl",
-    "/local/home/hsajelian/RT_IL/source/whole_body_tracking",
+    "/local/home/hsajelian/RT_IL/source/RT_IL",
 ]

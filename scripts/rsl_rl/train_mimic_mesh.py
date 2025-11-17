@@ -33,7 +33,7 @@ parser.add_argument(
     "--usd_name", type=str, default=None, help="Name of the USD mesh."
 )
 parser.add_argument(
-    "--usd_path", type=str, default="source/whole_body_tracking/whole_body_tracking/assets/usd/", help="Path to the USD mesh files."
+    "--usd_path", type=str, default="source/RT_IL/RT_IL/assets/usd/", help="Path to the USD mesh files."
 )
 
 # append RSL-RL cli arguments
@@ -82,8 +82,8 @@ from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
 # Import extensions to set up environment tasks
-import whole_body_tracking.tasks  # noqa: F401
-from whole_body_tracking.utils.my_on_policy_runner import MotionOnPolicyRunner as OnPolicyRunner
+import RT_IL.tasks  # noqa: F401
+from RT_IL.utils.my_on_policy_runner import MotionOnPolicyRunner as OnPolicyRunner
 
 
 torch.backends.cuda.matmul.allow_tf32 = True

@@ -54,7 +54,7 @@ from isaaclab.utils.math import axis_angle_from_quat, quat_conjugate, quat_mul, 
 ##
 # Pre-defined configs
 ##
-from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
+from RT_IL.robots.g1 import G1_CYLINDER_CFG
 
 
 @configclass

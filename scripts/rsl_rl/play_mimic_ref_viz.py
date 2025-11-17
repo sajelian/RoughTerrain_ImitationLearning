@@ -59,9 +59,9 @@ from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
 # Import extensions to set up environment tasks
-import whole_body_tracking.tasks  # noqa: F401
-from whole_body_tracking.tasks.tracking.mdp.commands import MotionCommand
-from whole_body_tracking.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
+import RT_IL.tasks  # noqa: F401
+from RT_IL.tasks.tracking.mdp.commands import MotionCommand
+from RT_IL.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
 
 
 @hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")

@@ -33,7 +33,7 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.assets import ArticulationCfg
 
-from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
+from RT_IL.robots.g1 import G1_CYLINDER_CFG
 
 import trimesh
 

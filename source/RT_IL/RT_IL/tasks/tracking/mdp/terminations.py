@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
 
-from whole_body_tracking.tasks.tracking.mdp.commands import MotionCommand
-from whole_body_tracking.tasks.tracking.mdp.rewards import _get_body_indexes
+from RT_IL.tasks.tracking.mdp.commands import MotionCommand
+from RT_IL.tasks.tracking.mdp.rewards import _get_body_indexes
 
 
 def bad_anchor_pos(env: ManagerBasedRLEnv, command_name: str, threshold: float) -> torch.Tensor:

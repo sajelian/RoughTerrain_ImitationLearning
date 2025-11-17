@@ -36,18 +36,18 @@ the [motion_tracking_controller](https://github.com/HybridRobotics/motion_tracki
 
 ```bash
 # Option 1: SSH
-git clone git@github.com:HybridRobotics/whole_body_tracking.git
+git clone git@github.com:sajelian/RT_IL.git
 
 # Option 2: HTTPS
-git clone https://github.com/HybridRobotics/whole_body_tracking.git
+git clone https://github.com/sajelian/RT_IL.git
 ```
 
 - Pull the robot description files from GCS
 
 ```bash
 # Enter the repository
-cd whole_body_tracking
-# Rename all occurrences of whole_body_tracking (in files/directories) to your_fancy_extension_name
+cd RT_IL
+# Rename all occurrences of RT_IL (in files/directories) to your_fancy_extension_name
 curl -L -o unitree_description.tar.gz https://storage.googleapis.com/qiayuanl_robot_descriptions/unitree_description.tar.gz && \
 tar -xzf unitree_description.tar.gz -C source/whole_body_tracking/whole_body_tracking/assets/ && \
 rm unitree_description.tar.gz
@@ -56,7 +56,7 @@ rm unitree_description.tar.gz
 - Using a Python interpreter that has Isaac Lab installed, install the library
 
 ```bash
-python -m pip install -e source/whole_body_tracking
+python -m pip install -e source/RT_IL
 ```
 
 ## Motion Tracking
@@ -125,7 +125,7 @@ with a unique 8-character identifier. Note that run_name is different from run_p
 
 Below is an overview of the code structure for this repository:
 
-- **`source/whole_body_tracking/whole_body_tracking/tasks/tracking/mdp`**
+- **`source/RT_IL/RT_IL/tasks/tracking/mdp`**
   This directory contains the atomic functions to define the MDP for BeyondMimic. Below is a breakdown of the functions:
 
     - **`commands.py`**
@@ -145,13 +145,13 @@ Below is an overview of the code structure for this repository:
     - **`terminations.py`**
       Implements early terminations and timeouts.
 
-- **`source/whole_body_tracking/whole_body_tracking/tasks/tracking/tracking_env_cfg.py`**
+- **`source/RT_IL/RT_IL/tasks/tracking/tracking_env_cfg.py`**
   Contains the environment (MDP) hyperparameters configuration for the tracking task.
 
-- **`source/whole_body_tracking/whole_body_tracking/tasks/tracking/config/g1/agents/rsl_rl_ppo_cfg.py`**
+- **`source/RT_IL/RT_IL/tasks/tracking/config/g1/agents/rsl_rl_ppo_cfg.py`**
   Contains the PPO hyperparameters for the tracking task.
 
-- **`source/whole_body_tracking/whole_body_tracking/robots`**
+- **`source/RT_IL/RT_IL/robots`**
   Contains robot-specific settings, including armature parameters, joint stiffness/damping calculation, and action scale
   calculation.
 

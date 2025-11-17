@@ -24,7 +24,7 @@ from isaaclab.sensors import RayCasterCfg, MultiMeshRayCasterCfg, patterns
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
-import whole_body_tracking.tasks.tracking.mdp as mdp
+import RT_IL.tasks.tracking.mdp as mdp
 
 ##
 # Scene definition
