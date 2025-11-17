@@ -1,5 +1,5 @@
 """Helper script to visualize terrains in Isaac Sim and adapt positions according to robot. Mesh must be in USD format.
-Example usage: python scripts/terrain_viz/terrain_viz_usd_multi_ray.py --usd_file meshes/step.usd --num_envs=2
+Example usage: python scripts/terrain_viz/terrain_viz_usd_multi_ray.py --usd_name step --num_envs=2
 """
 
 """Launch Isaac Sim Simulator first."""
@@ -15,9 +15,6 @@ parser.add_argument(
 parser.add_argument(
     "--usd_name", type=str, default=None, help="Name of the USD mesh."
 )
-parser.add_argument(
-    "--usd_path", type=str, default="source/RT_IL/RT_IL/assets/usd/", help="Path to the USD mesh files."
-)
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -29,8 +26,9 @@ app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 # USD import and config
-usd_path = args_cli.usd_path + f"{args_cli.usd_name}" + ".usd"
-usd_cfg_path = args_cli.usd_path + "config/" + f"{args_cli.usd_name}" + ".yaml"
+usd_folder = "source/RT_IL/RT_IL/assets/usd/"
+usd_path = usd_folder + f"{args_cli.usd_name}/" + f"{args_cli.usd_name}" + ".usd"
+usd_cfg_path = usd_folder + f"{args_cli.usd_name}/" + "config.yaml"
 
 # Fetch config from yaml
 with open(usd_cfg_path, "r") as f:

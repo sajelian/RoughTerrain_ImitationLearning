@@ -1,6 +1,7 @@
 """Use velocity task policy to traverse mesh terrain and collect data implement data collection."""
 """ Example usage:
-python scripts/rsl_rl/record_mesh_trajectory.py --task Isaac-Velocity-Mesh-G1-Play-v0  --load_run 2025-10-31_01-13-53 --checkpoint model_6000.pt --motion_length 200 --usd_name step --headless"""
+python scripts/rsl_rl/record_mesh_trajectory.py --task Isaac-Velocity-Mesh-G1-Play-v0  --load_run 2025-10-31_01-13-53 --checkpoint model_6000.pt --motion_length 200 --usd_name step --headless
+"""
 """Launch Isaac Sim Simulator first."""
 
 import argparse
@@ -42,9 +43,6 @@ parser.add_argument("--task", type=str, default="Isaac-Velocity-Mesh-G1-Play-v0"
 parser.add_argument(
     "--usd_name", type=str, default=None, help="Name of the USD mesh."
 )
-parser.add_argument(
-    "--usd_path", type=str, default="source/RT_IL/RT_IL/assets/usd/", help="Path to the USD mesh files."
-)
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -60,8 +58,9 @@ app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 # USD import and config
-usd_path = args_cli.usd_path + f"{args_cli.usd_name}" + ".usd"
-usd_cfg_path = args_cli.usd_path + "config/" + f"{args_cli.usd_name}" + ".yaml"
+usd_folder = "source/RT_IL/RT_IL/assets/usd/"
+usd_path = usd_folder + f"{args_cli.usd_name}/" + f"{args_cli.usd_name}" + ".usd"
+usd_cfg_path = usd_folder + f"{args_cli.usd_name}/" + "config.yaml"
 
 # Fetch config from yaml
 with open(usd_cfg_path, "r") as f:
@@ -271,7 +270,7 @@ def main():
 
         trajectory = np.hstack((body_pos, body_quat, joint_pos))
 
-        trajectory_path = os.path.join("mesh_trajectories", "trajectory.csv")
+        trajectory_path = os.path.join("trajectories/mesh", f"{args_cli.usd_name}_trajectory.csv")
         os.makedirs(os.path.dirname(trajectory_path), exist_ok=True)
         np.savetxt(trajectory_path, trajectory, delimiter=",", fmt="%.17f")
 

@@ -32,9 +32,6 @@ parser.add_argument("--registry_name", type=str, required=True, help="The name o
 parser.add_argument(
     "--usd_name", type=str, default=None, help="Name of the USD mesh."
 )
-parser.add_argument(
-    "--usd_path", type=str, default="source/RT_IL/RT_IL/assets/usd/", help="Path to the USD mesh files."
-)
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -54,8 +51,9 @@ app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 # USD import and config
-usd_path = args_cli.usd_path + f"{args_cli.usd_name}" + ".usd"
-usd_cfg_path = args_cli.usd_path + "config/" + f"{args_cli.usd_name}" + ".yaml"
+usd_folder = "source/RT_IL/RT_IL/assets/usd/"
+usd_path = usd_folder + f"{args_cli.usd_name}/" + f"{args_cli.usd_name}" + ".usd"
+usd_cfg_path = usd_folder + f"{args_cli.usd_name}/" + "config.yaml"
 
 # Fetch config from yaml
 with open(usd_cfg_path, "r") as f:
