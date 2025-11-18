@@ -11,9 +11,11 @@ class G1FlatEnvCfg(TrackingEnvCfg):
     def __post_init__(self):
         super().__post_init__()
 
+        # remove height scan for flat env
         self.scene.height_scanner = None
         self.observations.policy.height_scan = None
         self.observations.critic.height_scan = None
+
         self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.env_spacing = 5.0
         self.actions.joint_pos.scale = G1_ACTION_SCALE
@@ -60,5 +62,3 @@ class G1MimicFlatEnvCfg_PLAY(G1FlatEnvCfg):
         super().__post_init__()
         self.commands.motion.debug_vis = False
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
-        # self.viewer.eye = (6.0, 6.0, 6.0)
-        # self.terminations = None # Could make sense
