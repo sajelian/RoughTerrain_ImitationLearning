@@ -19,7 +19,7 @@ parser.add_argument("--video_length", type=int, default=200, help="Length of the
 parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
+parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default="Tracking-Mesh-G1-Play-v0", help="Name of the task.")
 parser.add_argument("--registry_name", type=str, required=True, help="The name of the wand registry.")
 parser.add_argument(

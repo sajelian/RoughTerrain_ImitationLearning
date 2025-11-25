@@ -5,7 +5,7 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 @configclass
 class G1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
-    max_iterations = 30000
+    max_iterations = 15000
     save_interval = 500
     experiment_name = "g1_mimic_flat"
     empirical_normalization = True
@@ -34,7 +34,7 @@ class G1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 @configclass
 class G1MeshPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
-    max_iterations = 30000
+    max_iterations = 15000
     save_interval = 500
     experiment_name = "g1_mimic_mesh"
     empirical_normalization = True

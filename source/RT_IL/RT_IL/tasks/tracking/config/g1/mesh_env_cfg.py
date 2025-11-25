@@ -28,7 +28,7 @@ class G1MeshEnvCfg(TrackingEnvCfg):
             usd_path="",
             scale=(1.0, 1.0, 1.0),
             visual_material=sim_utils.materials.PreviewSurfaceCfg(
-                diffuse_color=(0.4, 0.4, 0.4),
+                diffuse_color=(0.2, 0.2, 0.2),
                 emissive_color=(0.0, 0.0, 0.0),
                 roughness=0.5,
                 metallic=0.5,
@@ -82,4 +82,7 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
         # self.viewer.eye = (6.0, 6.0, 6.0)
         self.commands.motion.class_type = FixedStartMotionCommand
-        self.terminations = None
+        # reduce termination thresholds to show failures more clearly
+        self.terminations.anchor_pos = None
+        self.terminations.anchor_ori = None
+        self.terminations.ee_body_pos = None
