@@ -86,3 +86,4 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         self.terminations.anchor_pos = None
         self.terminations.anchor_ori = None
         self.terminations.ee_body_pos = None
+        self.events.push_robot = None
