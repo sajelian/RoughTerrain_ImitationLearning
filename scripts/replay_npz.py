@@ -3,7 +3,7 @@
 .. code-block:: bash
 
     # Usage
-    python replay_motion.py --motion_file source/RT_IL/RT_IL/assets/g1/motions/lafan_walk_short.npz
+    python scripts/replay_npz.py --registry_name=sajelian-eth-zurich-org/wandb-registry-Motions/s7_offset
 """
 
 """Launch Isaac Sim Simulator first."""

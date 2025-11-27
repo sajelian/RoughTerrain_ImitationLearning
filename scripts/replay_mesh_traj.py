@@ -1,6 +1,6 @@
 """Script to replay motion loaded from a wandb registry with mesh terrain.
 Example usage:
-python scripts/replay_mesh_traj.py --registry_name=sajelian-eth-zurich-org/wandb-registry-Motions/step_traversal
+python scripts/replay_mesh_traj.py --registry_name=sajelian-eth-zurich-org/wandb-registry-Motions/step_traversal --usd_name sequence_07
 """
 
 """Launch Isaac Sim Simulator first."""
@@ -129,6 +129,8 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     time_steps = torch.zeros(scene.num_envs, dtype=torch.long, device=sim.device)
 
     # Simulation loop
+
+    sim.set_camera_view((-3.5, 0, 2.0), (0, -1, 0.1))
     while simulation_app.is_running():
         time_steps += 1
         reset_ids = time_steps >= motion.time_step_total
@@ -146,8 +148,8 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         sim.render()  # We don't want physic (sim.step())
         scene.update(sim_dt)
 
-        pos_lookat = root_states[0, :3].cpu().numpy()
-        sim.set_camera_view(pos_lookat + np.array([2.0, 2.0, 0.5]), pos_lookat)
+        #pos_lookat = root_states[0, :3].cpu().numpy()
+        #sim.set_camera_view(pos_lookat + np.array([2.0, 2.0, 0.5]), pos_lookat)
 
 
 def main():

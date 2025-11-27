@@ -34,7 +34,7 @@ class G1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 @configclass
 class G1MeshPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
-    max_iterations = 15000
+    max_iterations = 50000
     save_interval = 500
     experiment_name = "g1_mimic_mesh"
     empirical_normalization = True
