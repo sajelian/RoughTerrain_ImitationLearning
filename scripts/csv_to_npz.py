@@ -296,7 +296,6 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joi
                 "body_ang_vel_w",
             ):
                 log[k] = np.stack(log[k], axis=0)
-            # log["body_pos_w"][..., 2] # rather not adjust height here 
             np.savez("/tmp/motion.npz", **log)
 
             import wandb
