@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """Script to train mimic task agent on mesh terrain.
-python scripts/rsl_rl/train_mimic_mesh.py --registry_name=sajelian-eth-zurich-org/wandb-registry-Motions/sequence_07_z0 --usd_name sequence_07 --num_envs 2048 --headless --video --video_interval 7500 --logger wandb --log_project_name RT_IL
+python scripts/rsl_rl/train_mimic_mesh.py --registry_name=sajelian-eth-zurich-org/wandb-registry-Motions/sequence_07_z0 --usd_name sequence_07_fix --num_envs 2048 --headless --video --video_interval 7500 --logger wandb --log_project_name RT_IL
 """
 
 """Launch Isaac Sim Simulator first."""

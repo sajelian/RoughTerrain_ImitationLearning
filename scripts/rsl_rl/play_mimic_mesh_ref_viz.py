@@ -127,7 +127,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     import wandb
     api = wandb.Api()
-    artifact = api.artifact(args_cli.registry_name)
+    # load the motion file from the wandb registry
+    registry_name = args_cli.registry_name
+    if ":" not in registry_name:  # Check if the registry name includes alias, if not, append ":latest"
+        registry_name += ":latest"
+    artifact = api.artifact(registry_name)
     env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
 
     env_cfg.scene.obstacle = env_cfg.scene.obstacle.replace(
