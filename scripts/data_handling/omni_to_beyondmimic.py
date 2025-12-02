@@ -15,7 +15,7 @@ from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Replay motion from csv file and output to npz file.")
-parser.add_argument("--input_file", type=str, required=True, help="The path to the input motion csv file.")
+parser.add_argument("--input_file", type=str, required=True, help="The path to the input motion ?npz? file.")
 parser.add_argument("--input_fps", type=int, default=30, help="The fps of the input motion.")
 parser.add_argument(
     "--frame_range",
@@ -100,7 +100,7 @@ class MotionLoader:
 
     def _load_motion(self):
         """Loads the motion from the npz file."""
-        with np.load(self.motion_file, allow_pickle=False) as data:
+        with np.load(self.motion_file, allow_pickle=True) as data:
             motion = data["qpos"]
             if "fps" in data.files:
                 self.input_fps = int(data["fps"].item())
