@@ -40,6 +40,8 @@ _build
 *.zarr
 *.npz
 
-**/assets/
+**/assets/meshes/
+**/assets/unitree_description/
+**/assets/usd/
 artifacts/
 **/meshes/
