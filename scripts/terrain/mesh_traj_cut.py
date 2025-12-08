@@ -4,7 +4,7 @@ import trimesh
 
 trajectory = pandas.read_csv('trajectories/mesh/sequence_07_rdy.csv')
 mesh = trimesh.load_mesh('source/RT_IL/RT_IL/assets/meshes/sequence_07.obj')
-mesh.invert()
+mesh.invert()  #TODO remove this if Alex fixes the mesh orientation on his end
 
 # Offset the mesh by translation, TODO this should not be needed if Alex applies the translation on his end
 apply_translation = True
