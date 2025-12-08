@@ -85,7 +85,7 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         # self.viewer.eye = (4.5, 4.5, 2.5)
         # self.viewer.origin_type = "env"
         # self.viewer.resolution = (1920, 1080)
-
+        # always start from beginning of motion
         self.commands.motion.class_type = FixedStartMotionCommand
         # reduce termination thresholds to show failures more clearly
         self.terminations.anchor_pos = None
