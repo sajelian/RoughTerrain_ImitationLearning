@@ -211,6 +211,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     scene = env.unwrapped.scene
     viz_robot = scene["viz_robot"]
     motion_term: MotionCommand = env.unwrapped.command_manager.get_term("motion")  # type: ignore
+    apply_noise = False  # need this later to collect data for the diffusion model
 
     def _update_viz_robot():
         """Mirror the current motion command on the visualization robot."""
@@ -229,6 +230,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         with torch.inference_mode():
             # agent stepping
             actions = policy(obs)
+
+            # apply action noise if specified
+            if apply_noise:
+                # add noise to the actions, sample from normal distribution with mean at the actual action
+                actions = torch.normal(mean=actions, std=0.5 * torch.ones_like(actions))
+
             # env stepping
             obs, _, _, _ = env.step(actions)
             _update_viz_robot()
