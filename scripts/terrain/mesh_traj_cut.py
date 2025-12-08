@@ -22,8 +22,9 @@ end_sphere = trimesh.creation.icosphere(radius=0.1, subdivisions=3)
 end_sphere.apply_translation(trajectory.iloc[-1, 0:3].to_numpy())
 end_sphere.visual.face_colors = [255, 0, 0, 255]
 
-tube_radius = 1.32
-traj_points = trajectory.iloc[:, 0:3].to_numpy()
+tube_radius = 1.32  # TODO tune
+tube_offset = np.array([0.0, 0.0, -0.66])  # TODO tune
+traj_points = trajectory.iloc[:, 0:3].to_numpy() + tube_offset
 segment_starts = traj_points[:-1]
 segment_ends = traj_points[1:]
 segment_dirs = segment_ends - segment_starts
@@ -70,5 +71,5 @@ if len(mesh.vertices):
     mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
 
 scene = trimesh.Scene([mesh, trajectory_path, start_sphere, end_sphere])
-scene.show()  # type: ignore
-mesh.export('source/RT_IL/RT_IL/assets/meshes/sequence_07_fix.obj')  # type: ignore
+scene.show()
+mesh.export('source/RT_IL/RT_IL/assets/meshes/sequence_07_fix.obj')
