@@ -1,19 +1,30 @@
+# use conda mesh env
 import numpy as np
 import pandas
 import trimesh
 
-trajectory = pandas.read_csv('trajectories/mesh/sequence_07_rdy.csv')
-mesh = trimesh.load_mesh('source/RT_IL/RT_IL/assets/meshes/sequence_07.obj')
-mesh.invert()  #TODO remove this if Alex fixes the mesh orientation on his end
+trajectory = pandas.read_csv('trajectories/mesh/steps_diag.csv')
+mesh = trimesh.load_mesh('source/RT_IL/RT_IL/assets/meshes/sequence_07_fix.obj')
 
 # Offset the mesh by translation, TODO this should not be needed if Alex applies the translation on his end
 apply_translation = True
 if apply_translation:
-    mesh.apply_translation((0, 0, 1.47))
+    mesh.apply_translation((0, 0, -1.47))
 
-trajectory_path = trimesh.load_path(trajectory.iloc[:, 0:3].to_numpy())
-# color the trajectory path
-trajectory_path.colors = [[255, 247, 0, 255]]
+traj_vertices = trajectory.iloc[:, 0:3].to_numpy()
+traj_segments = len(traj_vertices) - 1
+entities = [trimesh.path.entities.Line(np.array([i, i + 1])) for i in range(traj_segments)] if traj_segments > 0 else []
+trajectory_path = trimesh.path.Path3D(vertices=traj_vertices, entities=entities)
+if traj_segments > 0:
+    trajectory_path.colors = np.linspace(
+        [0, 255, 0, 255],
+        [255, 0, 0, 255],
+        num=traj_segments,
+        dtype=np.uint8,
+    )
+else:
+    trajectory_path.colors = np.array([[0, 255, 0, 255]], dtype=np.uint8)
+
 # mark the start and end points with green and red spheres # TODO could also do cones and use orientation aswell
 start_sphere = trimesh.creation.icosphere(radius=0.1, subdivisions=3)
 start_sphere.apply_translation(trajectory.iloc[0, 0:3].to_numpy())
@@ -71,5 +82,5 @@ if len(mesh.vertices):
     mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
 
 scene = trimesh.Scene([mesh, trajectory_path, start_sphere, end_sphere])
-scene.show()
-mesh.export('source/RT_IL/RT_IL/assets/meshes/sequence_07_fix.obj')
+scene.show(background=[131, 139, 150, 255])
+mesh.export('source/RT_IL/RT_IL/assets/meshes/steps_diag.obj')
