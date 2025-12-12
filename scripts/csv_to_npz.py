@@ -1,4 +1,4 @@
-"""This script replay a motion from a csv file and output it to a npz file
+"""This script replay a motion from a csv file and output it to a npz  and also calculates velocities.
 
 .. code-block:: bash
 
