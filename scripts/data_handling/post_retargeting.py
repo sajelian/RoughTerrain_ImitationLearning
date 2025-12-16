@@ -3,11 +3,11 @@ import numpy as np
 import pandas
 import matplotlib.pyplot as plt
 
-with np.load("trajectories/mesh/ledge_walk_mod.npz", allow_pickle=True) as npz:
+with np.load("trajectories/mesh/crawling_prepped.npz", allow_pickle=True) as npz:
     data = dict(npz)
 
 # Load retargeted data
-retargeted_data = pandas.read_csv('trajectories/mesh/ledge_walk.csv', header=None)
+retargeted_data = pandas.read_csv('trajectories/mesh/crawling.csv', header=None)
 
 while retargeted_data.shape[0] < data["trans"].shape[0]:
     retargeted_data = pandas.concat([retargeted_data, retargeted_data.iloc[[-1]]], ignore_index=True)
@@ -36,4 +36,4 @@ if plot:
     plt.show()
 
 # save
-retargeted_data.to_csv('trajectories/mesh/ledge_walk_rdy.csv', index=False, header=False)
+retargeted_data.to_csv('trajectories/mesh/crawling_rdy.csv', index=False, header=False)

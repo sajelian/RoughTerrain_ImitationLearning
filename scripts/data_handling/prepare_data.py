@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-with np.load("trajectories/mesh/ledge_walk.npz", allow_pickle=True) as npz:
+with np.load("trajectories/mesh/crawling.npz", allow_pickle=True) as npz:
     data = dict(npz)
 
 # squash betas, they are all the same across frames and pad to be size (16,)
@@ -25,4 +25,4 @@ data["trans"] = data.pop("transl")
 data["gender"] = "male"
 
 # save
-np.savez("trajectories/mesh/ledge_walk_mod.npz", **data)
+np.savez("trajectories/mesh/crawling_prepped.npz", **data)

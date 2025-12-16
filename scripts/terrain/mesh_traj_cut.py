@@ -3,13 +3,13 @@ import numpy as np
 import pandas
 import trimesh
 
-trajectory = pandas.read_csv('trajectories/mesh/steps_diag.csv')
-mesh = trimesh.load_mesh('source/RT_IL/RT_IL/assets/meshes/sequence_07_fix.obj')
+trajectory = pandas.read_csv('trajectories/mesh/crawling_rdy.csv')
+mesh = trimesh.load_mesh('source/RT_IL/RT_IL/assets/meshes/sequence_09_inv.obj')
 
 # Offset the mesh by translation, TODO this should not be needed if Alex applies the translation on his end
-apply_translation = True
+apply_translation = False
 if apply_translation:
-    mesh.apply_translation((0, 0, -1.47))
+    mesh.apply_translation((0, 0, 1.295))
 
 traj_vertices = trajectory.iloc[:, 0:3].to_numpy()
 traj_segments = len(traj_vertices) - 1
@@ -62,25 +62,27 @@ for start in range(0, len(vertices), chunk_size):
 faces_mask = inside_vertices[mesh.faces].all(axis=1)
 mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
 
-if len(mesh.vertices):
-    vertices = mesh.vertices
-    below_traj = np.zeros(len(vertices), dtype=bool)
+cut_z = False  # TODO this is buggy, don't use for now
+if cut_z:
+    if len(mesh.vertices):
+        vertices = mesh.vertices
+        below_traj = np.zeros(len(vertices), dtype=bool)
 
-    for start in range(0, len(vertices), chunk_size):
-        verts_chunk = vertices[start:start + chunk_size]
-        rel = verts_chunk[:, None, :] - segment_starts[None, :, :]
-        proj = np.einsum('ijk,jk->ij', rel, safe_dirs) / segment_length_sq
-        proj = np.clip(proj, 0.0, 1.0)
-        closest = segment_starts + proj[:, :, None] * safe_dirs
-        deltas = verts_chunk[:, None, :] - closest
-        dist_sq = np.einsum('ijk,ijk->ij', deltas, deltas)
-        min_idx = dist_sq.argmin(axis=1)
-        closest_z = closest[np.arange(len(verts_chunk)), min_idx, 2]
-        below_traj[start:start + chunk_size] = verts_chunk[:, 2] <= closest_z
+        for start in range(0, len(vertices), chunk_size):
+            verts_chunk = vertices[start:start + chunk_size]
+            rel = verts_chunk[:, None, :] - segment_starts[None, :, :]
+            proj = np.einsum('ijk,jk->ij', rel, safe_dirs) / segment_length_sq
+            proj = np.clip(proj, 0.0, 1.0)
+            closest = segment_starts + proj[:, :, None] * safe_dirs
+            deltas = verts_chunk[:, None, :] - closest
+            dist_sq = np.einsum('ijk,ijk->ij', deltas, deltas)
+            min_idx = dist_sq.argmin(axis=1)
+            closest_z = closest[np.arange(len(verts_chunk)), min_idx, 2]
+            below_traj[start:start + chunk_size] = verts_chunk[:, 2] <= closest_z
 
-    faces_mask = below_traj[mesh.faces].all(axis=1)
-    mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
+        faces_mask = below_traj[mesh.faces].all(axis=1)
+        mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
 
 scene = trimesh.Scene([mesh, trajectory_path, start_sphere, end_sphere])
 scene.show(background=[131, 139, 150, 255])
-mesh.export('source/RT_IL/RT_IL/assets/meshes/steps_diag.obj')
+mesh.export('source/RT_IL/RT_IL/assets/meshes/sequence_09_inv_cropped.obj')
