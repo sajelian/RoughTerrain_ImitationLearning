@@ -209,12 +209,17 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     timestep = 0
 
     scene = env.unwrapped.scene
-    viz_robot = scene["viz_robot"]
+    try:
+        viz_robot = scene["viz_robot"]
+    except KeyError:
+        viz_robot = None
     motion_term: MotionCommand = env.unwrapped.command_manager.get_term("motion")  # type: ignore
     apply_noise = False  # need this later to collect data for the diffusion model
 
     def _update_viz_robot():
         """Mirror the current motion command on the visualization robot."""
+        if viz_robot is None:
+            return
         root_states = viz_robot.data.default_root_state.clone()
         root_states[:, :3] = motion_term.body_pos_w[:, 0]
         root_states[:, 3:7] = motion_term.body_quat_w[:, 0]

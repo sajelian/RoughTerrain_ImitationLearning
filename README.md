@@ -6,9 +6,9 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](https://opensource.org/license/mit)
 
-[[Website]](https://beyondmimic.github.io/)
-[[Arxiv]](https://arxiv.org/abs/2508.08241)
-[[Video]](https://youtu.be/RS_MtKVIAzY)
+<!-- [[Website]](https://beyondmimic.github.io/) -->
+<!-- [[Arxiv]](https://arxiv.org/abs/2508.08241) -->
+<!-- [[Video]](https://youtu.be/RS_MtKVIAzY) -->
 
 ## Overview
 This repo implements the tracking of motions over rough terrain for a Unitree G1 Humanoid.
@@ -23,9 +23,6 @@ train any sim-to-real-ready motion in the LAFAN1 dataset, without tuning any par
 For sim-to-sim and sim-to-real deployment, please refer to
 the [motion_tracking_controller](https://github.com/HybridRobotics/motion_tracking_controller). -->
 
-### Alternative Implementations
-
-- There is an alternative reproduction of BeyondMimic in [mjlab](https://github.com/mujocolab/mjlab), a new Isaac Lab-style manager API powered by MuJoCo-Warp for RL and robotics research. See the implementation [here](https://github.com/mujocolab/mjlab/blob/main/src/mjlab/tasks/tracking/tracking_env_cfg.py).
 
 ## Installation
 
@@ -50,7 +47,7 @@ git clone https://github.com/sajelian/RT_IL.git
 cd RT_IL
 # Rename all occurrences of RT_IL (in files/directories) to your_fancy_extension_name
 curl -L -o unitree_description.tar.gz https://storage.googleapis.com/qiayuanl_robot_descriptions/unitree_description.tar.gz && \
-tar -xzf unitree_description.tar.gz -C source/whole_body_tracking/whole_body_tracking/assets/ && \
+tar -xzf unitree_description.tar.gz -C source/RT_IL/RT_IL/assets/ && \
 rm unitree_description.tar.gz
 ```
 
