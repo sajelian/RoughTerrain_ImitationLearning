@@ -26,7 +26,7 @@ the [motion_tracking_controller](https://github.com/HybridRobotics/motion_tracki
 
 ## Installation
 
-- Install Isaac Lab ~~v2.2.0~~ (wait for release version that includes MultiRayCaster, for now checkout the branch in this [PR](https://github.com/isaac-sim/IsaacLab/pull/3298)) by following
+- Install Isaac Lab ~~v2.2.0~~ (wait for release version that includes MultiMeshRayCaster, for now checkout the branch in this [PR](https://github.com/isaac-sim/IsaacLab/pull/3298)) by following
   the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html). We recommend
   using the conda installation as it simplifies calling Python scripts from the terminal.
 
