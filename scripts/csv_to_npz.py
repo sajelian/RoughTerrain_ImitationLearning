@@ -9,6 +9,7 @@
 """Launch Isaac Sim Simulator first."""
 
 import argparse
+import os
 import numpy as np
 
 from isaaclab.app import AppLauncher
@@ -240,6 +241,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joi
         "body_ang_vel_w": [],
     }
     file_saved = False
+    loop = False  # set to True to loop motion playback
     # --------------------------------------------------------------------------
 
     # Simulation loop
@@ -308,6 +310,12 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joi
             run.link_artifact(artifact=logged_artifact, target_path=f"wandb-registry-{REGISTRY}/{COLLECTION}")
             print(f"[INFO]: Motion saved to wandb registry: {REGISTRY}/{COLLECTION}")
 
+            # exit after saving
+            if not loop:
+                print("[INFO]: Motion playback complete, exiting...")
+                # simulation_app.close()
+                os._exit(0)  # hard exit to mirror Ctrl+C
+
 
 def main():
     """Main function."""
@@ -361,7 +369,9 @@ def main():
 
 
 if __name__ == "__main__":
-    # run the main function
-    main()
-    # close sim app
-    simulation_app.close()
+    try:
+        # run the main function
+        main()
+    finally:
+        # close sim app
+        simulation_app.close()
