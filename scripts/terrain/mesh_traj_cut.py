@@ -1,13 +1,34 @@
 # use conda mesh env
+import argparse
+import os
+
 import numpy as np
 import pandas
 import trimesh
 
-trajectory = pandas.read_csv('trajectories/mesh/crawling_rdy.csv')
-mesh = trimesh.load_mesh('source/RT_IL/RT_IL/assets/meshes/sequence_09_inv.obj')
+
+parser = argparse.ArgumentParser(description="Cut mesh geometry around a trajectory tube.")
+parser.add_argument("--trajectory", required=True, help="CSV file containing the trajectory.")
+parser.add_argument("--mesh", required=True, help="Mesh file to crop.")
+parser.add_argument(
+    "--output",
+    default=None,
+    help="Output mesh path. Defaults to <mesh_basename>_cropped.obj in the same directory as the input mesh.",
+)
+args = parser.parse_args()
+
+if args.output:
+    output_path = args.output
+else:
+    mesh_name = os.path.splitext(os.path.basename(args.mesh))[0]
+    output_path = os.path.join(os.path.dirname(args.mesh), f"{mesh_name}_cropped.obj")
+
+trajectory = pandas.read_csv(args.trajectory)
+mesh = trimesh.load_mesh(args.mesh)
+show_scene = False
 
 # Offset the mesh by translation, TODO this should not be needed if Alex applies the translation on his end
-apply_translation = False
+apply_translation = True
 if apply_translation:
     mesh.apply_translation((0, 0, 1.295))
 
@@ -84,5 +105,6 @@ if cut_z:
         mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
 
 scene = trimesh.Scene([mesh, trajectory_path, start_sphere, end_sphere])
-scene.show(background=[131, 139, 150, 255])
-mesh.export('source/RT_IL/RT_IL/assets/meshes/sequence_09_inv_cropped.obj')
+if show_scene:
+    scene.show(background=[131, 139, 150, 255])
+mesh.export(output_path)
