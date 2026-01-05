@@ -61,7 +61,7 @@ def main() -> None:
 
     retargeted_data.iloc[:, 2] += args.leica_z  # TODO this is hard coded figure out an automatic way (or at least chose one location where this is defined)
 
-    plot = True
+    plot = False
     if plot:
         plt.scatter(data["trans"][:, 0], data["trans"][:, 1], s=10, label='original')
         plt.scatter(retargeted_data.iloc[:, 0], retargeted_data.iloc[:, 1], s=1, label='retargeted')
