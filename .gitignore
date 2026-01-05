@@ -45,3 +45,4 @@ _build
 **/assets/usd/
 artifacts/
 **/meshes/
+**/trajectories
