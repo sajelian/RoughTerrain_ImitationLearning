@@ -3,7 +3,7 @@
 .. code-block:: bash
 
     # Usage
-    python scripts/csv_to_npz.py --input_file {motion_name}.csv --input_fps 50 --output_name {motion_name} --headless
+    python scripts/csv_to_npz.py --input_file {motion_name}.csv --input_fps 30 --output_name {motion_name} --headless
 """
 
 """Launch Isaac Sim Simulator first."""
