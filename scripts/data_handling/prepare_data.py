@@ -9,7 +9,7 @@ from scipy.spatial.transform import Rotation as R
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--motion_file",
+        "--motion-file",
         type=Path,
         default=Path("trajectories/mesh/motion.npz"),
         help="Path to the source SMPL-X trajectory npz file.",
