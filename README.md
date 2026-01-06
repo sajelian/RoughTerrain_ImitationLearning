@@ -1,6 +1,6 @@
 # Rough Terrain Traversal Through Imitation Learning Code
 [![IsaacSim](https://img.shields.io/badge/IsaacSim-5.0.0-silver.svg)](https://docs.omniverse.nvidia.com/isaacsim/latest/overview.html)
-[![Isaac Lab](https://img.shields.io/badge/IsaacLab-2.2.1-silver)](https://isaac-sim.github.io/IsaacLab)
+[![Isaac Lab](https://img.shields.io/badge/IsaacLab-2.3.1-silver)](https://isaac-sim.github.io/IsaacLab)
 [![Python](https://img.shields.io/badge/python-3.11.13-blue.svg)](https://docs.python.org/3/whatsnew/3.11.html)
 [![Linux platform](https://img.shields.io/badge/platform-linux--64-orange.svg)](https://releases.ubuntu.com/20.04/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
@@ -26,7 +26,7 @@ the [motion_tracking_controller](https://github.com/HybridRobotics/motion_tracki
 
 ## Installation
 
-- Install Isaac Lab ~~v2.2.0~~ (wait for release version that includes MultiMeshRayCaster, for now checkout the main branch which should include this [PR](https://github.com/isaac-sim/IsaacLab/pull/3298)) by following
+- Install Isaac Lab v2.3.1 (version must support MultiMeshRayCaster) by following
   the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html). We recommend
   using the conda installation as it simplifies calling Python scripts from the terminal.
 
