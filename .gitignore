@@ -40,12 +40,10 @@ _build
 *.zarr
 *.npz
 
-**/assets/meshes/
+
 **/assets/unitree_description/
-**/assets/usd/
+
 artifacts/
-**/meshes/
-**/trajectories
 
 **/scripts/data_handling/data_inspect.py
 
