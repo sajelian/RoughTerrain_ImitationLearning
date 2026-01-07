@@ -46,3 +46,5 @@ _build
 artifacts/
 **/meshes/
 **/trajectories
+
+**/scripts/data_handling/data_inspect.py
