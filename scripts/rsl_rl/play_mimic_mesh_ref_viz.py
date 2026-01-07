@@ -42,7 +42,7 @@ app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 # USD import and config
-usd_folder = "source/RT_IL/RT_IL/assets/usd/"
+usd_folder = "data/terrains/prepared/"
 usd_path = usd_folder + f"{args_cli.usd_name}/" + f"{args_cli.usd_name}" + ".usd"
 usd_cfg_path = usd_folder + f"{args_cli.usd_name}/" + "config.yaml"
 
