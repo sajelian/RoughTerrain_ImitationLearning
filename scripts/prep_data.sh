@@ -37,14 +37,14 @@ EOF
 }
 
 MOTION_NPZ=""
-OUT_DIR="trajectories/mesh"
+OUT_DIR="data/motions/prepared"
 LEICA_Z="0.0"
 OUTPUT_NAME=""
 HEADLESS_FLAG=""
 KEEP_INTERMEDIATE=0
 
 MESH_OBJ=""
-MESH_OUT_DIR="${HOME}/RT_IL/source/RT_IL/RT_IL/assets/usd"
+MESH_OUT_DIR="data/terrains/prepared"
 MESH_CUT_SCRIPT="${HOME}/RT_IL/scripts/terrain/mesh_traj_cut.py"
 SKIP_MESH=0
     
@@ -224,6 +224,7 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
   run_in_mesh python "${MESH_CUT_SCRIPT}" \
     --trajectory "${FINAL_RDY_CSV}" \
     --mesh "${MESH_OBJ}" \
+    --leica-z "${LEICA_Z}" \
     --output "${CROPPED_OBJ}"
   [[ -f "${CROPPED_OBJ}" ]] || { echo "Expected cropped OBJ not found: ${CROPPED_OBJ}" >&2; exit 1; }
 

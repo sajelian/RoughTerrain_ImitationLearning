@@ -1,6 +1,6 @@
 import trimesh
 
-mesh = trimesh.load_mesh('source/RT_IL/RT_IL/assets/meshes/terrain.obj')
+mesh = trimesh.load_mesh('data/terrains/raw/lee_h.obj')
 #mesh.invert()
 
 mesh.show(background=[131, 139, 150, 255])

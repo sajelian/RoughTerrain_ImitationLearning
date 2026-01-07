@@ -48,3 +48,5 @@ artifacts/
 **/trajectories
 
 **/scripts/data_handling/data_inspect.py
+
+**/data

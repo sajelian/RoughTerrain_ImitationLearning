@@ -14,6 +14,14 @@ parser.add_argument(
     default=None,
     help="Output mesh path. Defaults to <mesh_basename>_cropped.obj in the same directory as the input mesh.",
 )
+
+parser.add_argument(
+    "--leica-z",
+    type=float,
+    default=0.0,  # 1.295, 1.3
+    help="Optional offset to add to z height to account for lidar height difference.",
+)
+
 args = parser.parse_args()
 
 if args.output:
@@ -21,7 +29,7 @@ if args.output:
 else:
     trajectory_name = os.path.splitext(os.path.basename(args.trajectory))[0]
     mesh_name = os.path.splitext(os.path.basename(args.mesh))[0]
-    output_path = os.path.join(os.path.dirname(args.mesh), f"{trajectory_name}_{mesh_name}_cropped.obj")
+    output_path = os.path.join(os.path.dirname(args.mesh), f"{trajectory_name}_{mesh_name}.obj")
 
 trajectory = pandas.read_csv(args.trajectory)
 mesh = trimesh.load_mesh(args.mesh)
@@ -30,7 +38,7 @@ show_scene = False
 # Offset the mesh by translation, TODO this should not be needed if Alex applies the translation on his end
 apply_translation = True
 if apply_translation:
-    mesh.apply_translation((0, 0, 1.295))
+    mesh.apply_translation((0, 0, args.leica_z))
 
 traj_vertices = trajectory.iloc[:, 0:3].to_numpy()
 traj_segments = len(traj_vertices) - 1
