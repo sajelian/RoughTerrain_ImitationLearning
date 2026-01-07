@@ -1,4 +1,3 @@
-# use conda mesh env
 import argparse
 import os
 
@@ -20,8 +19,9 @@ args = parser.parse_args()
 if args.output:
     output_path = args.output
 else:
+    trajectory_name = os.path.splitext(os.path.basename(args.trajectory))[0]
     mesh_name = os.path.splitext(os.path.basename(args.mesh))[0]
-    output_path = os.path.join(os.path.dirname(args.mesh), f"{mesh_name}_cropped.obj")
+    output_path = os.path.join(os.path.dirname(args.mesh), f"{trajectory_name}_{mesh_name}_cropped.obj")
 
 trajectory = pandas.read_csv(args.trajectory)
 mesh = trimesh.load_mesh(args.mesh)
