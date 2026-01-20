@@ -59,39 +59,15 @@ python -m pip install -e source/RT_IL
 
 ## Motion Tracking
 
-### Motion Preprocessing & Registry Setup
+### Motion and Terrain Preprocessing
 
-In order to manage the large set of motions we used in this work, we leverage the WandB registry to store and load
-reference motions automatically.
-Note: The reference motion should be retargeted and use generalized coordinates only.
-
-- Gather the reference motion datasets (please follow the original licenses), we use the same convention as .csv of
-  Unitree's dataset
-
-    - Unitree-retargeted LAFAN1 Dataset is available
-      on [HuggingFace](https://huggingface.co/datasets/lvhaidong/LAFAN1_Retargeting_Dataset)
-    - Sidekicks are from [KungfuBot](https://kungfu-bot.github.io/)
-    - Christiano Ronaldo celebration is from [ASAP](https://github.com/LeCAR-Lab/ASAP).
-    - Balance motions are from [HuB](https://hub-robot.github.io/)
-
-
-- Log in to your WandB account; access Registry under Core on the left. Create a new registry collection with the name "
+First log in to your WandB account; access Registry under Core on the left. Create a new registry collection with the name "
   Motions" and artifact type "All Types".
 
+To prepare the motion and terrain data for training, run the following script:
 
-- Convert retargeted motions to include the maximum coordinates information (body pose, body velocity, and body
-  acceleration) via forward kinematics,
-
-```bash
-python scripts/csv_to_npz.py --input_file {motion_name}.csv --input_fps 30 --output_name {motion_name} --headless
-```
-
-This will automatically upload the processed motion file to the WandB registry with output name {motion_name}.
-
-- Test if the WandB registry works properly by replaying the motion in Isaac Sim:
-
-```bash
-python scripts/replay_npz.py --registry_name={your-organization}-org/wandb-registry-motions/{motion_name}
+```bash bash ./scripts/prep_data.sh --motion-npz data/motions/raw/<motion>.npz --leica-z <z-offset> --headless --mesh data/terrains/raw/<terrain>.obj
+./scripts/prep_data.sh --motion-npz data/motions/raw/<motion>.npz --leica-z <z-offset> --headless --mesh data/terrains/raw/<terrain>.obj
 ```
 
 - Debugging
@@ -108,52 +84,14 @@ python scripts/rsl_rl/train.py --task=Tracking-Flat-G1-v0 \
 --headless --logger wandb --log_project_name {project_name} --run_name {run_name}
 ```
 
+``` bash
+python scripts/rsl_rl/train_mimic_mesh.py --registry_name={your-organization}-org/wandb-registry-Motions/{motion_name} --usd_name {usd_mesh_file} --num_envs {e.g. 4096} --logger wandb --log_project_name {project_name}
+```
+
 ### Policy Evaluation
 
 - Play the trained policy by the following command:
 
 ```bash
-python scripts/rsl_rl/play.py --task=Tracking-Flat-G1-v0 --num_envs=2 --wandb_path={wandb-run-path}
+python scripts/rsl_rl/play_mimic_mesh_ref_viz.py --registry_name={your-organization}-org/wandb-registry-Motions/{motion_name} --usd_name {usd_mesh_file} --num_envs {e.g. 1}
 ```
-
-The WandB run path can be located in the run overview. It follows the format {your_organization}/{project_name}/ along
-with a unique 8-character identifier. Note that run_name is different from run_path.
-
-## Code Structure
-
-Below is an overview of the code structure for this repository:
-
-- **`source/RT_IL/RT_IL/tasks/tracking/mdp`**
-  This directory contains the atomic functions to define the MDP for BeyondMimic. Below is a breakdown of the functions:
-
-    - **`commands.py`**
-      Command library to compute relevant variables from the reference motion, current robot state, and error
-      computations. This includes pose and velocity error calculation, initial state randomization, and adaptive
-      sampling.
-
-    - **`rewards.py`**
-      Implements the DeepMimic reward functions and smoothing terms.
-
-    - **`events.py`**
-      Implements domain randomization terms.
-
-    - **`observations.py`**
-      Implements observation terms for motion tracking and data collection.
-
-    - **`terminations.py`**
-      Implements early terminations and timeouts.
-
-- **`source/RT_IL/RT_IL/tasks/tracking/tracking_env_cfg.py`**
-  Contains the environment (MDP) hyperparameters configuration for the tracking task.
-
-- **`source/RT_IL/RT_IL/tasks/tracking/config/g1/agents/rsl_rl_ppo_cfg.py`**
-  Contains the PPO hyperparameters for the tracking task.
-
-- **`source/RT_IL/RT_IL/robots`**
-  Contains robot-specific settings, including armature parameters, joint stiffness/damping calculation, and action scale
-  calculation.
-
-- **`scripts`**
-  Includes utility scripts for preprocessing motion data, training policies, and evaluating trained policies.
-
-This structure is designed to ensure modularity and ease of navigation for developers expanding the project.
