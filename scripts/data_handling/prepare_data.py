@@ -29,6 +29,12 @@ def main() -> None:
     with np.load(args.motion_file, allow_pickle=True) as npz:
         data = dict(npz)
 
+    for key in ("betas", "global_orient", "body_pose", "transl", "joints"):
+        if key not in data:
+            smplx_key = f"smplx_{key}"
+            if smplx_key in data:
+                data[key] = data.pop(smplx_key)
+
     # squash betas, they are all the same across frames and pad to be size (16,)
     data["betas"] = data["betas"][0]
     data["betas"] = np.pad(data["betas"], (0, 6))
