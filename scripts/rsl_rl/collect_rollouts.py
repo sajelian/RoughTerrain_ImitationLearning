@@ -1,5 +1,4 @@
 """Collect rollouts with learned Mimic Policy and noise on actions (to gather corrective actions)."""
-# TODO implement this
 
 """Launch Isaac Sim Simulator first."""
 
@@ -55,6 +54,7 @@ with open(usd_cfg_path, "r") as f:
 """Rest everything follows."""
 
 import gymnasium as gym
+import numpy as np
 import os
 import pathlib
 import torch
@@ -75,6 +75,7 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 
 # Import extensions to set up environment tasks
 import RT_IL.tasks  # noqa: F401
+from RT_IL.tasks.tracking.mdp.commands import MotionCommand
 from RT_IL.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
 
 
@@ -207,15 +208,59 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     attach_onnx_metadata(env.unwrapped, args_cli.wandb_path if args_cli.wandb_path else "none", export_model_dir)
     # reset environment
     obs = env.get_observations()
-    timestep = 0
 
     scene = env.unwrapped.scene
+    robot = scene["robot"]
+    data_joint_names = [
+        "left_hip_pitch_joint",
+        "left_hip_roll_joint",
+        "left_hip_yaw_joint",
+        "left_knee_joint",
+        "left_ankle_pitch_joint",
+        "left_ankle_roll_joint",
+        "right_hip_pitch_joint",
+        "right_hip_roll_joint",
+        "right_hip_yaw_joint",
+        "right_knee_joint",
+        "right_ankle_pitch_joint",
+        "right_ankle_roll_joint",
+        "waist_yaw_joint",
+        "waist_roll_joint",
+        "waist_pitch_joint",
+        "left_shoulder_pitch_joint",
+        "left_shoulder_roll_joint",
+        "left_shoulder_yaw_joint",
+        "left_elbow_joint",
+        "left_wrist_roll_joint",
+        "left_wrist_pitch_joint",
+        "left_wrist_yaw_joint",
+        "right_shoulder_pitch_joint",
+        "right_shoulder_roll_joint",
+        "right_shoulder_yaw_joint",
+        "right_elbow_joint",
+        "right_wrist_roll_joint",
+        "right_wrist_pitch_joint",
+        "right_wrist_yaw_joint",
+    ]
+    data_joint_indices = robot.find_joints(data_joint_names, preserve_order=True)[0]
+    data_joint_indices_tensor = torch.as_tensor(
+        data_joint_indices, dtype=torch.long, device=robot.data.joint_pos.device
+    )
+    rollout_rows: list[np.ndarray] = []
+    output_dir = os.path.join("data", "motions", "inference")
+    os.makedirs(output_dir, exist_ok=True)
+    output_name = args_cli.usd_name or "rollout"
+    output_path = os.path.join(output_dir, f"{output_name}_rollout.csv")
     try:
         viz_robot = scene["viz_robot"]
     except KeyError:
         viz_robot = None
     motion_term: MotionCommand = env.unwrapped.command_manager.get_term("motion")  # type: ignore
     apply_noise = False  # need this later to collect data for the diffusion model
+    target_steps = int(motion_term.motion.time_step_total)
+    attempt_steps = 0
+    attempt_count = 0
+    completed = False
 
     def _update_viz_robot():
         """Mirror the current motion command on the visualization robot."""
@@ -231,7 +276,18 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         scene.write_data_to_sim()
 
     # simulate environment
-    while simulation_app.is_running():
+    while simulation_app.is_running() and not completed:
+        root_pos = robot.data.root_pos_w[0].clone()
+        root_pos[:2] -= scene.env_origins[0, :2]
+        root_quat = robot.data.root_quat_w[0]
+        root_quat_xyzw = root_quat[[1, 2, 3, 0]]
+        joint_pos = torch.index_select(robot.data.joint_pos[0], 0, data_joint_indices_tensor)
+        rollout_rows.append(torch.cat([root_pos, root_quat_xyzw, joint_pos]).cpu().numpy().copy())
+        attempt_steps += 1
+        if attempt_steps >= target_steps:
+            completed = True
+            break
+
         # run everything in inference mode
         with torch.inference_mode():
             # agent stepping
@@ -243,16 +299,23 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 actions = torch.normal(mean=actions, std=0.5 * torch.ones_like(actions))
 
             # env stepping
-            obs, _, _, _ = env.step(actions)
+            obs, _, dones, _ = env.step(actions)
             _update_viz_robot()
-        if args_cli.video:
-            timestep += 1
-            # Exit the play loop after recording one video
-            if timestep == args_cli.video_length:
-                break
+        if torch.any(dones > 0).item():
+            attempt_count += 1
+            rollout_rows.clear()
+            attempt_steps = 0
+            print(f"[INFO]: Rollout terminated early; retrying (attempt {attempt_count}).")
 
     # close the simulator
     env.close()
+
+    if completed and rollout_rows:
+        trajectory = np.asarray(rollout_rows, dtype=np.float64)
+        np.savetxt(output_path, trajectory, delimiter=",", fmt="%.17f")
+        print(f"[INFO]: Saved rollout to: {output_path}")
+    else:
+        print("[WARN]: Rollout did not complete; nothing saved.")
 
 
 if __name__ == "__main__":
