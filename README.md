@@ -11,7 +11,7 @@
 <!-- [[Video]](https://youtu.be/RS_MtKVIAzY) -->
 
 ## Overview
-This repo implements the tracking of motions over rough terrain for a Unitree G1 Humanoid.
+This repository implements the mimicing of motions over rough terrains for a Unitree G1 robot using feature-based imitation learning. It acts as a expert-policy collecting subcomponent of the HumanoidRTT framework.
 
 <!-- BeyondMimic is a versatile humanoid control framework that provides highly dynamic motion tracking with the
 state-of-the-art motion quality on real-world deployment and steerable test-time control with guided diffusion-based
