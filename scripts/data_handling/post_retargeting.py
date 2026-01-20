@@ -47,23 +47,23 @@ def main() -> None:
     # Load retargeted data
     retargeted_data = pandas.read_csv(args.retargeted_csv, header=None)
 
-    while retargeted_data.shape[0] < data["trans"].shape[0]:
+    while retargeted_data.shape[0] < data["joints"][:, 0, :].shape[0]:
         retargeted_data = pandas.concat([retargeted_data, retargeted_data.iloc[[-1]]], ignore_index=True)
 
     overwrite_all = True
     if not overwrite_all:
         # can use this to only offset starting xy
         xy = retargeted_data.iloc[:, :2].to_numpy()
-        xy += data["trans"][0, :2] - xy[0]
+        xy += data["joints"][:, 0, :][0, :2] - xy[0]
         retargeted_data.iloc[:, :2] = xy
     else:
-        retargeted_data.iloc[:, :3] = data["trans"][:, :]
+        retargeted_data.iloc[:, :3] = data["joints"][:, 0, :]
 
-    retargeted_data.iloc[:, 2] += args.leica_z  # TODO this is hard coded figure out an automatic way (or at least chose one location where this is defined)
+    retargeted_data.iloc[:, 2] += 0  # args.leica_z  # notic: new format has z already accounted for but keep this for old data
 
     plot = False
     if plot:
-        plt.scatter(data["trans"][:, 0], data["trans"][:, 1], s=10, label='original')
+        plt.scatter(data["joints"][:, 0, :][:, 0], data["joints"][:, 0, :][:, 1], s=10, label='original')
         plt.scatter(retargeted_data.iloc[:, 0], retargeted_data.iloc[:, 1], s=1, label='retargeted')
         plt.legend()
         plt.title("Root Position XY")
