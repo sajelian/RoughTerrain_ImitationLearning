@@ -29,9 +29,9 @@ Behavior:
 Trajectory output (always in --out-dir):
   <stem>_rt2g1_rdy.csv
 
-Mesh outputs (if --mesh is provided and not --skip-mesh), written to --mesh-out-dir (defaults to --out-dir):
-  <stem>_<meshname>_cropped.obj
-  <stem>_<meshname>_cropped/<stem>_<meshname>_cropped.usd
+Mesh outputs (if --mesh is provided and not --skip-mesh):
+  data/terrains/prepared/obj/<stem>_<meshname>_cropped.obj
+  <mesh-out-dir>/<stem>_<meshname>_cropped/<stem>_<meshname>_cropped.usd (defaults to data/terrains/prepared)
 EOF
   exit 1
 }
@@ -45,6 +45,7 @@ KEEP_INTERMEDIATE=0
 
 MESH_OBJ=""
 MESH_OUT_DIR="data/terrains/prepared"
+CROPPED_OBJ_DIR="data/terrains/prepared/obj"
 MESH_CUT_SCRIPT="${HOME}/RT_IL/scripts/terrain/mesh_traj_cut.py"
 SKIP_MESH=0
     
@@ -202,19 +203,15 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
   fi
   mkdir -p "${MESH_OUT_DIR}"
   MESH_OUT_DIR="$(cd "${MESH_OUT_DIR}" && pwd)"
+  mkdir -p "${CROPPED_OBJ_DIR}"
+  CROPPED_OBJ_DIR="$(cd "${CROPPED_OBJ_DIR}" && pwd)"
   MESH_OBJ="$(cd "$(dirname "${MESH_OBJ}")" && pwd)/$(basename "${MESH_OBJ}")"
 
   motion_name="${STEM}"
   terrain_name="$(basename "${MESH_OBJ}")"; terrain_name="${terrain_name%.*}"
 
-  # Where to write cropped obj:
-  # - if keep-intermediate, keep alongside mesh outputs
-  # - else, crop in WORK_DIR then copy to MESH_OUT_DIR at end
-  if [[ "${KEEP_INTERMEDIATE}" -eq 1 ]]; then
-    CROPPED_OBJ="${WORK_DIR}/${motion_name}_${terrain_name}_cropped.obj"
-  else
-    CROPPED_OBJ="${WORK_DIR}/${motion_name}_${terrain_name}_cropped.obj"
-  fi
+  # Always store cropped OBJ in the prepared obj folder.
+  CROPPED_OBJ="${CROPPED_OBJ_DIR}/${motion_name}_${terrain_name}_cropped.obj"
 
   echo
   echo "== Step 5: mesh_traj_cut.py (mesh env) =="
@@ -228,13 +225,6 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
     --output "${CROPPED_OBJ}" \
     ${HEADLESS_FLAG}
   [[ -f "${CROPPED_OBJ}" ]] || { echo "Expected cropped OBJ not found: ${CROPPED_OBJ}" >&2; exit 1; }
-
-  # If intermediates are not kept, copy cropped obj to mesh out dir now
-  if [[ "${KEEP_INTERMEDIATE}" -eq 0 ]]; then
-    echo "Copying cropped OBJ to ${MESH_OUT_DIR}"
-    cp -v "${CROPPED_OBJ}" "${MESH_OUT_DIR}/"
-    CROPPED_OBJ="${MESH_OUT_DIR}/$(basename "${CROPPED_OBJ}")"
-  fi
 
   cropped_stem="$(basename "${CROPPED_OBJ}")"; cropped_stem="${cropped_stem%.*}"
   USD_SUBDIR="${MESH_OUT_DIR}/${cropped_stem}"
@@ -254,12 +244,6 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
   [[ -f "${USD_FILE}" ]] || { echo "Expected USD not found: ${USD_FILE}" >&2; exit 1; }
   echo "Mesh USD: ${USD_FILE}"
 
-  # Delete cropped OBJ if intermediates are not kept
-  if [[ "${KEEP_INTERMEDIATE}" -eq 0 ]]; then
-    echo "Removing intermediate cropped OBJ: ${CROPPED_OBJ}"
-    rm -f "${CROPPED_OBJ}"
-  fi
-  
 fi
 
 echo
