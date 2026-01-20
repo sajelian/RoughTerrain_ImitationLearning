@@ -22,6 +22,13 @@ parser.add_argument(
     help="Optional offset to add to z height to account for lidar height difference.",
 )
 
+parser.add_argument(
+    "--headless",
+    default=False,
+    action="store_true",
+    help="Render the mesh scene for visualization.",
+)
+
 args = parser.parse_args()
 
 if args.output:
@@ -33,7 +40,7 @@ else:
 
 trajectory = pandas.read_csv(args.trajectory)
 mesh = trimesh.load_mesh(args.mesh)
-show_scene = False
+show_scene = True
 
 # Offset the mesh by translation, TODO this should not be needed if Alex applies the translation on his end
 apply_translation = True
@@ -113,6 +120,6 @@ if cut_z:
         mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
 
 scene = trimesh.Scene([mesh, trajectory_path, start_sphere, end_sphere])
-if show_scene:
+if not args.headless:
     scene.show(background=[131, 139, 150, 255])
 mesh.export(output_path)

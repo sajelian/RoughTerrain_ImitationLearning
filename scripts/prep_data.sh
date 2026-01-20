@@ -155,7 +155,7 @@ echo
 
 # ---- 2) smplx_to_g1_csv.sh (gmr) ----
 echo "== Step 2: smplx_to_g1_csv.sh (gmr) =="
-run_in_gmr bash "${SMPLX_TO_G1_SH}" "${PREPPED_NPZ}" "${WORK_DIR}"
+run_in_gmr bash "${SMPLX_TO_G1_SH}" ${HEADLESS_FLAG} "${PREPPED_NPZ}" "${WORK_DIR}"
 [[ -f "${RT_CSV}" ]] || {
   echo "Expected retargeted CSV not found: ${RT_CSV}" >&2
   echo "Check smplx_to_g1_csv.sh output directory/stem logic." >&2
@@ -225,7 +225,8 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
     --trajectory "${FINAL_RDY_CSV}" \
     --mesh "${MESH_OBJ}" \
     --leica-z "${LEICA_Z}" \
-    --output "${CROPPED_OBJ}"
+    --output "${CROPPED_OBJ}" \
+    ${HEADLESS_FLAG}
   [[ -f "${CROPPED_OBJ}" ]] || { echo "Expected cropped OBJ not found: ${CROPPED_OBJ}" >&2; exit 1; }
 
   # If intermediates are not kept, copy cropped obj to mesh out dir now
