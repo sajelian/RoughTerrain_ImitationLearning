@@ -6,6 +6,64 @@ import pandas
 import trimesh
 
 
+def strip_obj_materials(obj_path):
+    mtl_files = []
+    try:
+        with open(obj_path, "r", encoding="utf-8", errors="ignore") as obj_file:
+            lines = obj_file.readlines()
+    except OSError:
+        return mtl_files
+
+    filtered = []
+    for line in lines:
+        if line.startswith("mtllib "):
+            mtl_name = line.split(None, 1)[1].strip()
+            if mtl_name:
+                mtl_files.append(mtl_name)
+            continue
+        if line.startswith("usemtl "):
+            continue
+        filtered.append(line)
+
+    if filtered != lines:
+        with open(obj_path, "w", encoding="utf-8") as obj_file:
+            obj_file.writelines(filtered)
+
+    return mtl_files
+
+
+def cleanup_material_sidecars(obj_path, mtl_files):
+    output_dir = os.path.dirname(obj_path)
+    for mtl_name in mtl_files:
+        if os.path.basename(mtl_name) != mtl_name:
+            continue
+        mtl_path = os.path.join(output_dir, mtl_name)
+        if not os.path.isfile(mtl_path):
+            continue
+
+        textures = []
+        try:
+            with open(mtl_path, "r", encoding="utf-8", errors="ignore") as mtl_file:
+                for line in mtl_file:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if line.startswith("map_"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            textures.append(parts[-1])
+        except OSError:
+            textures = []
+
+        os.remove(mtl_path)
+        for tex_name in textures:
+            if os.path.basename(tex_name) != tex_name:
+                continue
+            tex_path = os.path.join(output_dir, tex_name)
+            if os.path.isfile(tex_path):
+                os.remove(tex_path)
+
+
 parser = argparse.ArgumentParser(description="Cut mesh geometry around a trajectory tube.")
 parser.add_argument("--trajectory", required=True, help="CSV file containing the trajectory.")
 parser.add_argument("--mesh", required=True, help="Mesh file to crop.")
@@ -123,3 +181,6 @@ scene = trimesh.Scene([mesh, trajectory_path, start_sphere, end_sphere])
 if not args.headless:
     scene.show(background=[131, 139, 150, 255])
 mesh.export(output_path)
+mtl_files = strip_obj_materials(output_path)
+if mtl_files:
+    cleanup_material_sidecars(output_path, mtl_files)
