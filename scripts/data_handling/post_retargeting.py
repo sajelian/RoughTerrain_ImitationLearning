@@ -59,7 +59,9 @@ def main() -> None:
     else:
         retargeted_data.iloc[:, :3] = data["joints"][:, 0, :]
 
-    retargeted_data.iloc[:, 2] += 0  # args.leica_z  # notic: new format has z already accounted for but keep this for old data
+    # notice: new FORMAT has z already accounted for but keep this for old data
+    # if robot is below the surface in GMR you need the offset!
+    retargeted_data.iloc[:, 2] += 0  # args.leica_z
 
     plot = False
     if plot:

@@ -76,7 +76,7 @@ parser.add_argument(
 parser.add_argument(
     "--leica-z",
     type=float,
-    default=0.0,  # 1.295, 1.3
+    default=0.0,
     help="Optional offset to add to z height to account for lidar height difference.",
 )
 
@@ -100,7 +100,8 @@ trajectory = pandas.read_csv(args.trajectory)
 mesh = trimesh.load_mesh(args.mesh)
 show_scene = True
 
-# Offset the mesh by translation, TODO this should not be needed if Alex applies the translation on his end
+# Offset the mesh by translation
+# # notice: new FORMAT has z already accounted for but keep this for old data
 apply_translation = True
 if apply_translation:
     mesh.apply_translation((0, 0, args.leica_z))
