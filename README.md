@@ -57,7 +57,7 @@ rm unitree_description.tar.gz
 python -m pip install -e source/RT_IL
 ```
 
-## Motion Tracking
+## Training Expert Policies
 
 ### Motion and Terrain Preprocessing
 
