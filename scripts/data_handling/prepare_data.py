@@ -40,7 +40,6 @@ def main() -> None:
             else:
                 raise KeyError(f"Key {key} not found in the input npz file.")
 
-
     # squash betas, they are all the same across frames and pad to be size (16,)
     data["betas"] = data["betas"][0]
     data["betas"] = np.pad(data["betas"], (0, 6))
