@@ -32,8 +32,14 @@ def main() -> None:
     for key in ("betas", "global_orient", "body_pose", "transl", "joints"):
         if key not in data:
             smplx_key = f"smplx_{key}"
+            smplx_egomc_key = f"smplx_egomc_{key}"
             if smplx_key in data:
                 data[key] = data.pop(smplx_key)
+            elif smplx_egomc_key in data:
+                data[key] = data.pop(smplx_egomc_key)
+            else:
+                raise KeyError(f"Key {key} not found in the input npz file.")
+
 
     # squash betas, they are all the same across frames and pad to be size (16,)
     data["betas"] = data["betas"][0]
