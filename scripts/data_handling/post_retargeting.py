@@ -30,8 +30,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--leica-z",
         type=float,
-        default=0.0,  # 1.295, 1.3
+        default=0.0,
         help="Optional offset to add to z height to account for lidar height difference.",
+    )
+
+    parser.add_argument(
+        "--cut-start",
+        type=bool,
+        default=True,
+        help="Whether to cut the start of the trajectory.",
     )
 
     return parser.parse_args()
@@ -62,6 +69,10 @@ def main() -> None:
     # notice: new FORMAT has z already accounted for but keep this for old data
     # if robot is below the surface in GMR you need the offset!
     retargeted_data.iloc[:, 2] += 0  # args.leica_z
+
+    if args.cut_start:
+        # cut first 60 frames to avoid initial "start recording motion"
+        retargeted_data = retargeted_data.iloc[60:].reset_index(drop=True)
 
     plot = False
     if plot:
