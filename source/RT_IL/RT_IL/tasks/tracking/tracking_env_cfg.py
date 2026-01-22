@@ -81,7 +81,7 @@ class MySceneCfg(InteractiveSceneCfg):
     # TODO: history? grid_pattern resolution/size? offset? history?
     height_scanner = MultiMeshRayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/torso_link",
-        history_length=0,  # TODO we need to check if history_length < 0 is need or maybe we need an LSTM
+        history_length=0,
         offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
         ray_alignment="yaw",
         pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=(1.6, 1.0)),
