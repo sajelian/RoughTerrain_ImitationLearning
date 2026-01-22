@@ -246,21 +246,81 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     data_joint_indices_tensor = torch.as_tensor(
         data_joint_indices, dtype=torch.long, device=robot.data.joint_pos.device
     )
-    rollout_rows: list[np.ndarray] = []
+    # states
+    root_pos_rows: list[np.ndarray] = []
+    root_quat_rows: list[np.ndarray] = []
+    joint_pos_rows: list[np.ndarray] = []
+    height_scan_rows: list[np.ndarray] = []
+    # actions
+    actions_rows: list[np.ndarray] = []
     output_dir = os.path.join("data", "motions", "inference")
     os.makedirs(output_dir, exist_ok=True)
     output_name = args_cli.usd_name or "rollout"
-    output_path = os.path.join(output_dir, f"{output_name}_rollout.csv")
+    output_path = os.path.join(output_dir, f"{output_name}_rollout.npz")
     try:
         viz_robot = scene["viz_robot"]
     except KeyError:
         viz_robot = None
     motion_term: MotionCommand = env.unwrapped.command_manager.get_term("motion")  # type: ignore
-    apply_noise = False  # need this later to collect data for the diffusion model
+    apply_noise = True  # need this later to collect data for the diffusion model
     target_steps = int(motion_term.motion.time_step_total)
     attempt_steps = 0
     attempt_count = 0
     completed = False
+    height_scanner = scene.sensors.get("height_scanner")
+    if height_scanner is None:
+        raise RuntimeError("Height scanner not found in scene; enable scene.height_scanner in the env config.")
+    height_scanner_cfg = env.unwrapped.cfg.scene.height_scanner
+    pattern_cfg = height_scanner_cfg.pattern_cfg
+    height_scan_resolution = float(pattern_cfg.resolution)
+    height_scan_size = (float(pattern_cfg.size[0]), float(pattern_cfg.size[1]))
+    height_scan_ordering = getattr(pattern_cfg, "ordering", "xy")
+    height_scan_x = np.arange(
+        -height_scan_size[0] / 2,
+        height_scan_size[0] / 2 + 1.0e-9,
+        height_scan_resolution,
+        dtype=np.float32,
+    )
+    height_scan_y = np.arange(
+        -height_scan_size[1] / 2,
+        height_scan_size[1] / 2 + 1.0e-9,
+        height_scan_resolution,
+        dtype=np.float32,
+    )
+    height_scan_count_x = int(height_scan_x.size)
+    height_scan_count_y = int(height_scan_y.size)
+    height_scan_num_rays = int(height_scanner.data.ray_hits_w.shape[1])
+    if height_scan_count_x * height_scan_count_y != height_scan_num_rays:
+        raise RuntimeError(
+            "Height scan shape mismatch: expected"
+            f" {height_scan_count_y}x{height_scan_count_x}={height_scan_count_x * height_scan_count_y},"
+            f" got {height_scan_num_rays} rays."
+        )
+    if height_scan_ordering == "xy":
+        height_scan_shape = (height_scan_count_y, height_scan_count_x)
+    else:
+        height_scan_shape = (height_scan_count_x, height_scan_count_y)
+    height_scan_offset_z = float(height_scanner_cfg.offset.pos[2])
+    height_scan_reference = "parent_frame"
+    obs_manager = env.unwrapped.observation_manager
+    policy_term_names = obs_manager.active_terms["policy"]
+    if "height_scan" not in policy_term_names:
+        raise RuntimeError("height_scan term not found in policy observations.")
+    height_scan_term_idx = policy_term_names.index("height_scan")
+    height_scan_term_dims = obs_manager.group_obs_term_dim["policy"][height_scan_term_idx]
+    height_scan_term_size = int(np.prod(height_scan_term_dims))
+    height_scan_term_start = int(
+        sum(np.prod(term_dims) for term_dims in obs_manager.group_obs_term_dim["policy"][:height_scan_term_idx])
+    )
+    policy_obs_concatenate = obs_manager.group_obs_concatenate["policy"]
+
+    def _extract_policy_height_scan(policy_obs: torch.Tensor | dict) -> torch.Tensor:
+        if policy_obs_concatenate:
+            height_scan_flat = policy_obs[:, height_scan_term_start : height_scan_term_start + height_scan_term_size]
+            if height_scan_term_dims:
+                return height_scan_flat.reshape((policy_obs.shape[0],) + height_scan_term_dims)
+            return height_scan_flat
+        return policy_obs["height_scan"]
 
     def _update_viz_robot():
         """Mirror the current motion command on the visualization robot."""
@@ -277,12 +337,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # simulate environment
     while simulation_app.is_running() and not completed:
-        root_pos = robot.data.root_pos_w[0].clone()
-        root_pos[:2] -= scene.env_origins[0, :2]
-        root_quat = robot.data.root_quat_w[0]
-        root_quat_xyzw = root_quat[[1, 2, 3, 0]]
-        joint_pos = torch.index_select(robot.data.joint_pos[0], 0, data_joint_indices_tensor)
-        rollout_rows.append(torch.cat([root_pos, root_quat_xyzw, joint_pos]).cpu().numpy().copy())
+        root_pos = robot.data.root_pos_w.clone()
+        root_pos[:, :2] -= scene.env_origins[:, :2]
+        root_quat = robot.data.root_quat_w
+        root_quat_xyzw = root_quat[:, [1, 2, 3, 0]]
+        joint_pos = torch.index_select(robot.data.joint_pos, 1, data_joint_indices_tensor)
+        root_pos_rows.append(root_pos.cpu().numpy().copy())
+        root_quat_rows.append(root_quat_xyzw.cpu().numpy().copy())
+        joint_pos_rows.append(joint_pos.cpu().numpy().copy())
+        height_scan = _extract_policy_height_scan(obs["policy"])
+        height_scan_rows.append(height_scan.cpu().numpy().copy())
         attempt_steps += 1
         if attempt_steps >= target_steps:
             completed = True
@@ -292,27 +356,50 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         with torch.inference_mode():
             # agent stepping
             actions = policy(obs)
-
+            actions_rows.append(actions.cpu().numpy().copy())  # store corrective actions without noise
             # apply action noise if specified
             if apply_noise:
                 # add noise to the actions, sample from normal distribution with mean at the actual action
-                actions = torch.normal(mean=actions, std=0.5 * torch.ones_like(actions))
+                actions = torch.normal(mean=actions, std=0.125 * torch.ones_like(actions))
 
             # env stepping
-            obs, _, dones, _ = env.step(actions)
+            obs, _, dones, _ = env.step(actions)  # apply noisy actions
             _update_viz_robot()
         if torch.any(dones > 0).item():
             attempt_count += 1
-            rollout_rows.clear()
+            root_pos_rows.clear()
+            root_quat_rows.clear()
+            joint_pos_rows.clear()
+            height_scan_rows.clear()
+            actions_rows.clear()
             attempt_steps = 0
             print(f"[INFO]: Rollout terminated early; retrying (attempt {attempt_count}).")
 
     # close the simulator
     env.close()
 
-    if completed and rollout_rows:
-        trajectory = np.asarray(rollout_rows, dtype=np.float64)
-        np.savetxt(output_path, trajectory, delimiter=",", fmt="%.17f")
+    if completed and root_pos_rows:
+        root_pos = np.asarray(root_pos_rows, dtype=np.float32)
+        root_quat = np.asarray(root_quat_rows, dtype=np.float32)
+        joint_pos = np.asarray(joint_pos_rows, dtype=np.float32)
+        height_scan = np.asarray(height_scan_rows, dtype=np.float32)
+        actions = np.asarray(actions_rows, dtype=np.float32)
+        np.savez(
+            output_path,
+            root_pos=root_pos,
+            root_quat=root_quat,
+            joint_pos=joint_pos,
+            joint_names=np.array(data_joint_names),
+            height_scan=height_scan,
+            height_scan_shape=np.array(height_scan_shape, dtype=np.int32),
+            height_scan_resolution=np.array([height_scan_resolution], dtype=np.float32),
+            height_scan_size=np.array(height_scan_size, dtype=np.float32),
+            height_scan_ordering=np.array(height_scan_ordering),
+            height_scan_offset_z=np.array([height_scan_offset_z], dtype=np.float32),
+            height_scan_reference=np.array(height_scan_reference),
+            actions=actions,
+            dt=np.array([env.unwrapped.step_dt], dtype=np.float32),
+        )
         print(f"[INFO]: Saved rollout to: {output_path}")
     else:
         print("[WARN]: Rollout did not complete; nothing saved.")
