@@ -78,6 +78,7 @@ class MySceneCfg(InteractiveSceneCfg):
 
     obstacle: AssetBaseCfg = MISSING
 
+    # TODO: history? grid_pattern resolution/size? offset? history?
     height_scanner = MultiMeshRayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/torso_link",
         history_length=0,  # TODO we need to check if history_length < 0 is need or maybe we need an LSTM
