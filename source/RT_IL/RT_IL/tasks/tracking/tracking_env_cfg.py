@@ -78,13 +78,13 @@ class MySceneCfg(InteractiveSceneCfg):
 
     obstacle: AssetBaseCfg = MISSING
 
-    # TODO: history? grid_pattern resolution/size? offset? history?
+    # Asymmetric scan: 0.4m forward offset gives ~1.0m ahead, ~0.2m behind torso
     height_scanner = MultiMeshRayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/torso_link",
         history_length=0,
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
+        offset=RayCasterCfg.OffsetCfg(pos=(0.4, 0.0, 20.0)),
         ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=(1.6, 1.0)),
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.06, size=(1.2, 0.6)),
         debug_vis=True,
         mesh_prim_paths=[
             "/World/ground",
