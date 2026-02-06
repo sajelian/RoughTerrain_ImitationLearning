@@ -44,7 +44,7 @@ class G1MeshEnvCfg(TrackingEnvCfg):
 
         self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.actions.joint_pos.scale = G1_ACTION_SCALE
-        self.scene.env_spacing = 5.0
+        self.scene.env_spacing = 10.0
         self.commands.motion.anchor_body_name = "torso_link"
         self.commands.motion.body_names = [
             "pelvis",
@@ -82,15 +82,15 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
 
         # Viewer options for filming whole motions externally
-        self.viewer.eye = (-3.8, -4.5, 2.5)
-        self.viewer.lookat = (2.2, -1.6, 0.0)
+        self.viewer.eye = (-1.5, -2.7, 2.4)
+        self.viewer.lookat = (4.0, -2.3, 0.5)
         self.viewer.origin_type = "env"
         self.viewer.resolution = (1920, 1080)
         # always start from beginning of motion
         self.commands.motion.class_type = FixedStartMotionCommand
         # reduce termination thresholds to show failures more clearly
-        self.terminations.anchor_pos = None
+        #self.terminations.anchor_pos = None
         self.terminations.anchor_ori = None
         self.terminations.ee_body_pos = None
         self.events.push_robot = None
-        self.episode_length_s = 20.0 # some motions are longer than default 20s
+        self.episode_length_s = 20.0 # some motions are longer than default 10s

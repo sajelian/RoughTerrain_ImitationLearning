@@ -70,9 +70,9 @@ def main() -> None:
     # if robot is below the surface in GMR you need the offset!
     retargeted_data.iloc[:, 2] += 0  # args.leica_z
 
-    if args.cut_start:
-        # cut first 60 frames to avoid initial "start recording motion"
-        retargeted_data = retargeted_data.iloc[60:].reset_index(drop=True)
+    # if args.cut_start:
+    #     # cut first 60 frames to avoid initial "start recording motion"
+    #     retargeted_data = retargeted_data.iloc[60:].reset_index(drop=True)
 
     plot = False
     if plot:

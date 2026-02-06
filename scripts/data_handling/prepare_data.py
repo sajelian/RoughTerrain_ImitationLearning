@@ -19,6 +19,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Optional output path; defaults to appending _prepped to the input stem.",
     )
+    parser.add_argument(
+        "--frame-range",
+        type=str,
+        default=None,
+        help="Optional frame range as START-END (e.g. 0-100 or 100-550). Both inclusive.",
+    )
     return parser.parse_args()
 
 
@@ -40,6 +46,14 @@ def main() -> None:
             else:
                 raise KeyError(f"Key {key} not found in the input npz file.")
 
+    # optionally slice to requested frame range
+    if args.frame_range is not None:
+        start, end = args.frame_range.split("-")
+        start, end = int(start), int(end) + 1  # inclusive end
+        for key in ("global_orient", "body_pose", "transl", "joints"):
+            if key in data and data[key].ndim >= 1:
+                data[key] = data[key][start:end]
+
     # squash betas, they are all the same across frames and pad to be size (16,)
     data["betas"] = data["betas"][0]
     data["betas"] = np.pad(data["betas"], (0, 6))
@@ -57,7 +71,7 @@ def main() -> None:
     data["pose_body"] = data.pop("body_pose")
     data["root_orient"] = data.pop("global_orient")
     data["trans"] = data.pop("transl")
-    data["gender"] = "male"
+    data["gender"] = "male"  # TODO check if final data has this, then drop it
 
     # save
     np.savez(output_path, **data)

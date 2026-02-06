@@ -14,7 +14,7 @@ SMPLX_TO_G1_SH="${GMR_REPO}/scripts/smplx_to_g1_csv.sh"
 usage() {
   cat >&2 <<EOF
 Usage:
-  $0 --motion-npz <motion.npz> --out-dir <output_dir> [--leica-z <float>] [--output-name <name>] [--headless] [--keep-intermediate]
+  $0 --motion-npz <motion.npz> --out-dir <output_dir> [--frame-range <start-end>] [--leica-z <float>] [--output-name <name>] [--headless] [--keep-intermediate]
 
 Behavior:
   - By default, intermediate files are created in a temp dir and deleted on exit.
@@ -30,6 +30,7 @@ MOTION_NPZ=""
 OUT_DIR=""
 LEICA_Z="0.0"
 OUTPUT_NAME=""
+FRAME_RANGE=""
 HEADLESS_FLAG=""
 KEEP_INTERMEDIATE=0
 
@@ -37,6 +38,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --motion-npz) MOTION_NPZ="$2"; shift 2 ;;
     --out-dir) OUT_DIR="$2"; shift 2 ;;
+    --frame-range) FRAME_RANGE="$2"; shift 2 ;;
     --leica-z) LEICA_Z="$2"; shift 2 ;;
     --output-name) OUTPUT_NAME="$2"; shift 2 ;;
     --headless) HEADLESS_FLAG="--headless"; shift 1 ;;
@@ -92,6 +94,7 @@ echo "Prepped NPZ     : ${PREPPED_NPZ}"
 echo "Retargeted CSV  : ${RT_CSV}"
 echo "Postproc CSV    : ${RDY_CSV}"
 echo "Final CSV       : ${FINAL_RDY_CSV}"
+echo "Frame range     : ${FRAME_RANGE:-all}"
 echo "W&B name        : ${OUTPUT_NAME}"
 echo
 
@@ -122,9 +125,14 @@ run_in_gmr() {
 
 # ---- 1) prepare_data.py (env_isaaclab + IsaacLab setup) ----
 echo "== Step 1: prepare_data.py (isaaclab) =="
+FRAME_RANGE_FLAG=""
+if [[ -n "${FRAME_RANGE}" ]]; then
+  FRAME_RANGE_FLAG="--frame-range ${FRAME_RANGE}"
+fi
 run_in_isaaclab python scripts/data_handling/prepare_data.py \
   --motion-file "${MOTION_NPZ}" \
-  --output-path "${PREPPED_NPZ}"
+  --output-path "${PREPPED_NPZ}" \
+  ${FRAME_RANGE_FLAG}
 [[ -f "${PREPPED_NPZ}" ]] || { echo "Expected file not found: ${PREPPED_NPZ}" >&2; exit 1; }
 echo
 
