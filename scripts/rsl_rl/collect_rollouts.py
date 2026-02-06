@@ -302,26 +302,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         height_scan_shape = (height_scan_count_x, height_scan_count_y)
     height_scan_offset_z = float(height_scanner_cfg.offset.pos[2])
     height_scan_reference = "parent_frame"
-    obs_manager = env.unwrapped.observation_manager
-    policy_term_names = obs_manager.active_terms["policy"]
-    if "height_scan" not in policy_term_names:
-        raise RuntimeError("height_scan term not found in policy observations.")
-    height_scan_term_idx = policy_term_names.index("height_scan")
-    height_scan_term_dims = obs_manager.group_obs_term_dim["policy"][height_scan_term_idx]
-    height_scan_term_size = int(np.prod(height_scan_term_dims))
-    height_scan_term_start = int(
-        sum(np.prod(term_dims) for term_dims in obs_manager.group_obs_term_dim["policy"][:height_scan_term_idx])
-    )
-    policy_obs_concatenate = obs_manager.group_obs_concatenate["policy"]
-
-    def _extract_policy_height_scan(policy_obs: torch.Tensor | dict) -> torch.Tensor:
-        if policy_obs_concatenate:
-            height_scan_flat = policy_obs[:, height_scan_term_start : height_scan_term_start + height_scan_term_size]
-            if height_scan_term_dims:
-                return height_scan_flat.reshape((policy_obs.shape[0],) + height_scan_term_dims)
-            return height_scan_flat
-        return policy_obs["height_scan"]
-
     def _update_viz_robot():
         """Mirror the current motion command on the visualization robot."""
         if viz_robot is None:
@@ -345,7 +325,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         root_pos_rows.append(root_pos.cpu().numpy().copy())
         root_quat_rows.append(root_quat_xyzw.cpu().numpy().copy())
         joint_pos_rows.append(joint_pos.cpu().numpy().copy())
-        height_scan = _extract_policy_height_scan(obs["policy"])
+        height_scan = height_scanner.data.pos_w[:, 2].unsqueeze(1) - height_scanner.data.ray_hits_w[..., 2]
         height_scan_rows.append(height_scan.cpu().numpy().copy())
         attempt_steps += 1
         if attempt_steps >= target_steps:
