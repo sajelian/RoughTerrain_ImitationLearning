@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -n 1
 #SBATCH --cpus-per-task=8
-#SBATCH --gpus=a100:1
+#SBATCH --gpus=rtx_4090:1
 #SBATCH --time=24:00:00
 #SBATCH --mem-per-cpu=16384
 #SBATCH --output=/cluster/scratch/%u/rt_il_logs/slurm-%j.out
