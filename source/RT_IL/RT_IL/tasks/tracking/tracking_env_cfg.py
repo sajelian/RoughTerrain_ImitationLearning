@@ -15,7 +15,7 @@ from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import ContactSensorCfg
 from isaaclab.terrains import TerrainImporterCfg
 
-from isaaclab.sensors import RayCasterCfg, MultiMeshRayCasterCfg, patterns
+from isaaclab.sensors.ray_caster import RayCasterCfg, MultiMeshRayCasterCfg, patterns
 
 
 ##
@@ -89,7 +89,7 @@ class MySceneCfg(InteractiveSceneCfg):
         mesh_prim_paths=[
             "/World/ground",
             MultiMeshRayCasterCfg.RaycastTargetCfg(
-                target_prim_expr="{ENV_REGEX_NS}/obstacle",
+                prim_expr="{ENV_REGEX_NS}/obstacle",
                 is_shared=True,
                 track_mesh_transforms=False,
             ),
