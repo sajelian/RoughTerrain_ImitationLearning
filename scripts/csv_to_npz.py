@@ -100,25 +100,41 @@ class MotionLoader:
         self._compute_velocities()
 
     def _load_motion(self):
-        """Loads the motion from the csv file."""
-        if self.frame_range is None:
-            motion = torch.from_numpy(np.loadtxt(self.motion_file, delimiter=","))
-        else:
-            motion = torch.from_numpy(
-                np.loadtxt(
-                    self.motion_file,
-                    delimiter=",",
-                    skiprows=self.frame_range[0] - 1,
-                    max_rows=self.frame_range[1] - self.frame_range[0] + 1,
-                )
-            )
-        motion = motion.to(torch.float32).to(self.device)
-        self.motion_base_poss_input = motion[:, :3]
-        self.motion_base_rots_input = motion[:, 3:7]
-        self.motion_base_rots_input = self.motion_base_rots_input[:, [3, 0, 1, 2]]  # convert to wxyz
-        self.motion_dof_poss_input = motion[:, 7:]
+        """Loads the motion from a csv or npz file.
 
-        self.input_frames = motion.shape[0]
+        CSV format (from GMR): columns are [root_pos(3), root_rot_xyzw(4), dof_pos(N)].
+        NPZ format (from OmniRetarget): 'qpos' field with [root_pos(3), root_rot_wxyz(4), dof_pos(N)].
+        """
+        is_npz = self.motion_file.endswith(".npz")
+
+        if is_npz:
+            data = np.load(self.motion_file)
+            motion_np = data["qpos"]
+            if self.frame_range is not None:
+                motion_np = motion_np[self.frame_range[0] - 1 : self.frame_range[1]]
+            motion = torch.from_numpy(motion_np).to(torch.float32).to(self.device)
+            self.motion_base_poss_input = motion[:, :3]
+            self.motion_base_rots_input = motion[:, 3:7]  # already wxyz
+            self.motion_dof_poss_input = motion[:, 7:]
+        else:
+            if self.frame_range is None:
+                motion = torch.from_numpy(np.loadtxt(self.motion_file, delimiter=","))
+            else:
+                motion = torch.from_numpy(
+                    np.loadtxt(
+                        self.motion_file,
+                        delimiter=",",
+                        skiprows=self.frame_range[0] - 1,
+                        max_rows=self.frame_range[1] - self.frame_range[0] + 1,
+                    )
+                )
+            motion = motion.to(torch.float32).to(self.device)
+            self.motion_base_poss_input = motion[:, :3]
+            self.motion_base_rots_input = motion[:, 3:7]
+            self.motion_base_rots_input = self.motion_base_rots_input[:, [3, 0, 1, 2]]  # convert xyzw to wxyz
+            self.motion_dof_poss_input = motion[:, 7:]
+
+        self.input_frames = self.motion_base_poss_input.shape[0]
         self.duration = (self.input_frames - 1) * self.input_dt
         print(f"Motion loaded ({self.motion_file}), duration: {self.duration} sec, frames: {self.input_frames}")
 
