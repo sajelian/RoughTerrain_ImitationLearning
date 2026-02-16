@@ -68,7 +68,8 @@ def main() -> None:
 
     # notice: new FORMAT has z already accounted for but keep this for old data
     # if robot is below the surface in GMR you need the offset!
-    retargeted_data.iloc[:, 2] += 0  # args.leica_z
+    # we can also ues this to add height if post-GMR ref is floating too much
+    retargeted_data.iloc[:, 2] -= 0.0  # args.leica_z, -0.2
 
     # if args.cut_start:
     #     # cut first 60 frames to avoid initial "start recording motion"
