@@ -28,9 +28,15 @@ if TYPE_CHECKING:
 
 
 class MotionLoader:
-    def __init__(self, motion_file: str, body_indexes: Sequence[int], device: str = "cpu"):
+    def __init__(
+        self,
+        motion_file: str,
+        body_names: list[str],
+        robot_body_indexes: torch.Tensor,
+        device: str = "cpu",
+    ):
         assert os.path.isfile(motion_file), f"Invalid file path: {motion_file}"
-        data = np.load(motion_file)
+        data = np.load(motion_file, allow_pickle=True)
         self.fps = data["fps"]
         self.joint_pos = torch.tensor(data["joint_pos"], dtype=torch.float32, device=device)
         self.joint_vel = torch.tensor(data["joint_vel"], dtype=torch.float32, device=device)
@@ -38,8 +44,27 @@ class MotionLoader:
         self._body_quat_w = torch.tensor(data["body_quat_w"], dtype=torch.float32, device=device)
         self._body_lin_vel_w = torch.tensor(data["body_lin_vel_w"], dtype=torch.float32, device=device)
         self._body_ang_vel_w = torch.tensor(data["body_ang_vel_w"], dtype=torch.float32, device=device)
-        self._body_indexes = body_indexes
         self.time_step_total = self.joint_pos.shape[0]
+
+        # Compute body indexes for motion data: use stored body_names if available,
+        # otherwise fall back to robot body indexes (works when robot matches motion data).
+        if "body_names" in data:
+            all_body_names = list(data["body_names"])
+            self._body_indexes = torch.tensor(
+                [all_body_names.index(name) for name in body_names],
+                dtype=torch.long,
+                device=device,
+            )
+        else:
+            max_idx = robot_body_indexes.max().item()
+            num_motion_bodies = self._body_pos_w.shape[1]
+            if max_idx >= num_motion_bodies:
+                raise RuntimeError(
+                    f"Motion file lacks 'body_names' metadata and robot body indices (max={max_idx}) "
+                    f"exceed motion body count ({num_motion_bodies}). "
+                    f"Regenerate the motion file with the updated csv_to_npz.py to include body_names."
+                )
+            self._body_indexes = robot_body_indexes
 
     @property
     def body_pos_w(self) -> torch.Tensor:
@@ -71,7 +96,9 @@ class MotionCommand(CommandTerm):
             self.robot.find_bodies(self.cfg.body_names, preserve_order=True)[0], dtype=torch.long, device=self.device
         )
 
-        self.motion = MotionLoader(self.cfg.motion_file, self.body_indexes, device=self.device)
+        self.motion = MotionLoader(
+            self.cfg.motion_file, self.cfg.body_names, self.body_indexes, device=self.device
+        )
         self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         self.body_pos_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 3, device=self.device)
         self.body_quat_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 4, device=self.device)
@@ -230,7 +257,7 @@ class MotionCommand(CommandTerm):
             (sampled_bins + sample_uniform(0.0, 1.0, (len(env_ids),), device=self.device))
             / self.bin_count
             * (self.motion.time_step_total - 1)
-        ).long()
+        ).clamp(0, self.motion.time_step_total - 1).long()
 
         # Metrics
         H = -(sampling_probabilities * (sampling_probabilities + 1e-12).log()).sum()

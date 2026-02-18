@@ -11,9 +11,17 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
 
 
+def _safe_quat(q: torch.Tensor) -> torch.Tensor:
+    """Replace zero quaternions with identity [1,0,0,0] to avoid quat_inv errors."""
+    norms = q.pow(2).sum(dim=-1, keepdim=True)
+    identity = torch.zeros_like(q)
+    identity[..., 0] = 1.0
+    return torch.where(norms < 1e-7, identity, q)
+
+
 def robot_anchor_ori_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    mat = matrix_from_quat(command.robot_anchor_quat_w)
+    mat = matrix_from_quat(_safe_quat(command.robot_anchor_quat_w))
     return mat[..., :2].reshape(mat.shape[0], -1)
 
 
@@ -33,11 +41,12 @@ def robot_body_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
 
     num_bodies = len(command.cfg.body_names)
+    anchor_quat = _safe_quat(command.robot_anchor_quat_w)
     pos_b, _ = subtract_frame_transforms(
         command.robot_anchor_pos_w[:, None, :].repeat(1, num_bodies, 1),
-        command.robot_anchor_quat_w[:, None, :].repeat(1, num_bodies, 1),
+        anchor_quat[:, None, :].repeat(1, num_bodies, 1),
         command.robot_body_pos_w,
-        command.robot_body_quat_w,
+        _safe_quat(command.robot_body_quat_w),
     )
 
     return pos_b.view(env.num_envs, -1)
@@ -47,11 +56,12 @@ def robot_body_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
 
     num_bodies = len(command.cfg.body_names)
+    anchor_quat = _safe_quat(command.robot_anchor_quat_w)
     _, ori_b = subtract_frame_transforms(
         command.robot_anchor_pos_w[:, None, :].repeat(1, num_bodies, 1),
-        command.robot_anchor_quat_w[:, None, :].repeat(1, num_bodies, 1),
+        anchor_quat[:, None, :].repeat(1, num_bodies, 1),
         command.robot_body_pos_w,
-        command.robot_body_quat_w,
+        _safe_quat(command.robot_body_quat_w),
     )
     mat = matrix_from_quat(ori_b)
     return mat[..., :2].reshape(mat.shape[0], -1)
@@ -62,9 +72,9 @@ def motion_anchor_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor
 
     pos, _ = subtract_frame_transforms(
         command.robot_anchor_pos_w,
-        command.robot_anchor_quat_w,
+        _safe_quat(command.robot_anchor_quat_w),
         command.anchor_pos_w,
-        command.anchor_quat_w,
+        _safe_quat(command.anchor_quat_w),
     )
 
     return pos.view(env.num_envs, -1)
@@ -75,9 +85,9 @@ def motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor
 
     _, ori = subtract_frame_transforms(
         command.robot_anchor_pos_w,
-        command.robot_anchor_quat_w,
+        _safe_quat(command.robot_anchor_quat_w),
         command.anchor_pos_w,
-        command.anchor_quat_w,
+        _safe_quat(command.anchor_quat_w),
     )
     mat = matrix_from_quat(ori)
     return mat[..., :2].reshape(mat.shape[0], -1)

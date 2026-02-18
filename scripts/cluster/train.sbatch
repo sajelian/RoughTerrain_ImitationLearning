@@ -29,7 +29,8 @@ mkdir -p "$LOG_DIR" "$PIP_CACHE" "$CONTAINER_TMP" \
     "$ISAAC_CACHE/cache/kit" "$ISAAC_CACHE/cache/ov" \
     "$ISAAC_CACHE/cache/pip" "$ISAAC_CACHE/cache/glcache" \
     "$ISAAC_CACHE/cache/computecache" "$ISAAC_CACHE/logs" \
-    "$ISAAC_CACHE/data" "$ISAAC_CACHE/documents"
+    "$ISAAC_CACHE/data" "$ISAAC_CACHE/documents" \
+    "$ISAAC_CACHE/kit_data"
 
 # === Run training inside container ===
 apptainer exec --nv --writable-tmpfs --cleanenv \
@@ -37,6 +38,7 @@ apptainer exec --nv --writable-tmpfs --cleanenv \
     --bind "$LOG_DIR:/workspace/RT_IL/logs" \
     --bind "$CONTAINER_TMP:/tmp:rw" \
     --bind "$ISAAC_CACHE/cache/kit:/isaac-sim/kit/cache:rw" \
+    --bind "$ISAAC_CACHE/kit_data:/isaac-sim/kit/data:rw" \
     --bind "$ISAAC_CACHE/cache/ov:/root/.cache/ov:rw" \
     --bind "$ISAAC_CACHE/cache/pip:/root/.cache/pip:rw" \
     --bind "$ISAAC_CACHE/cache/glcache:/root/.cache/nvidia/GLCache:rw" \
@@ -47,6 +49,7 @@ apptainer exec --nv --writable-tmpfs --cleanenv \
     --env "PIP_CACHE_DIR=/tmp/pip_cache" \
     --env "TMPDIR=/tmp" \
     --env "WANDB_API_KEY=$WANDB_API_KEY" \
+    --env "WARP_CACHE_PATH=/tmp/warp_cache" \
     --env "http_proxy=$http_proxy" \
     --env "https_proxy=$https_proxy" \
     --env "no_proxy=$no_proxy" \
