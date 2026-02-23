@@ -121,11 +121,16 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     artifact = api.artifact(registry_name)
     motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
 
-    motion = MotionLoader(
-        motion_file,
-        torch.tensor([0], dtype=torch.long, device=sim.device),
-        sim.device,
-    )
+    # Peek at the file to get body_names for the updated MotionLoader API.
+    _meta = np.load(motion_file, allow_pickle=True)
+    if "body_names" in _meta:
+        _body_names = list(_meta["body_names"])
+        _robot_body_indexes = torch.arange(len(_body_names), dtype=torch.long, device=sim.device)
+    else:
+        _body_names = []
+        _robot_body_indexes = torch.tensor([0], dtype=torch.long, device=sim.device)
+
+    motion = MotionLoader(motion_file, _body_names, _robot_body_indexes, sim.device)
     time_steps = torch.zeros(scene.num_envs, dtype=torch.long, device=sim.device)
 
     # Simulation loop
