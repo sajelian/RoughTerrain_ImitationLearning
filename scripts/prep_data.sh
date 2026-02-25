@@ -123,9 +123,9 @@ run_in_isaaclab() {
     conda activate "${ENV_ISAACLAB}"
 
     # IsaacLab setup script assumes ZSH_VERSION may be unset; avoid 'set -u' crash.
-    set +u
-    source "${ISAACLAB_SETUP}"
-    set -u
+    #set +u
+    #source "${ISAACLAB_SETUP}"
+    #set -u
 
     "$@"
   )
@@ -183,6 +183,7 @@ run_in_isaaclab python scripts/data_handling/post_retargeting.py \
 [[ -f "${RDY_CSV}" ]] || { echo "Expected file not found: ${RDY_CSV}" >&2; exit 1; }
 echo
 
+# TODO the csv script is timing out during upload to W&B
 # ---- 4) csv_to_npz.py (env_isaaclab + IsaacLab setup) ----
 echo "== Step 4: csv_to_npz.py (isaaclab) =="
 run_in_isaaclab python scripts/csv_to_npz.py \
@@ -240,6 +241,7 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
   USD_FILE="${USD_SUBDIR}/${cropped_stem}.usd"
   mkdir -p "${USD_SUBDIR}"
 
+  # TODO the folder setup seems corrupted, its not creating a subfolder for the cropped obj
   echo
   echo "== Step 6: convert_mesh.py (isaaclab) =="
   echo "USD output     : ${USD_FILE}"
