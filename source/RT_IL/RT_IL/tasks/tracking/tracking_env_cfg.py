@@ -27,11 +27,21 @@ from isaaclab.sensors.ray_caster import RayCasterCfg, MultiMeshRayCasterCfg, pat
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
+import numpy as np
+
 import RT_IL.tasks.tracking.mdp as mdp
 
-##
-# Scene definition
-##
+from isaaclab.terrains.trimesh.utils import make_plane
+
+GROUND_HEIGHT = -3.0
+
+
+def lowered_flat_terrain(difficulty, cfg):
+    """Flat terrain at GROUND_HEIGHT instead of z=0."""
+    origin = (cfg.size[0] / 2.0, cfg.size[1] / 2.0, GROUND_HEIGHT)
+    plane_mesh = make_plane(cfg.size, GROUND_HEIGHT, center_zero=False)
+    return [plane_mesh], np.array(origin)
+
 
 VELOCITY_RANGE = {
     "x": (-0.5, 0.5),
@@ -59,9 +69,20 @@ class MySceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a legged robot."""
 
     # ground terrain
-    ground = TerrainImporterCfg(
+    terrain = TerrainImporterCfg(
         prim_path="/World/ground",
-        terrain_type="plane",
+        terrain_type="generator",
+        terrain_generator=TerrainGeneratorCfg(
+            size=(100.0, 100.0),
+            num_rows=1,
+            num_cols=1,
+            border_width=0.0,
+            sub_terrains={
+                "flat": terrain_gen.MeshPlaneTerrainCfg(function=lowered_flat_terrain),
+            },
+        ),
+        use_terrain_origins=False,
+        env_spacing=2.5,
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
@@ -405,8 +426,10 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         # simulation settings
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation
-        self.sim.physics_material = self.scene.ground.physics_material
+        self.sim.physics_material = self.scene.terrain.physics_material
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**17
+        # depends on mesh -> needs to scale with num_envs
+        self.sim.physx.gpu_collision_stack_size = 3 * 2**15 * self.scene.num_envs
         # viewer settings
         self.viewer.eye = (1.5, 1.5, 1.5)
         self.viewer.origin_type = "asset_root"
