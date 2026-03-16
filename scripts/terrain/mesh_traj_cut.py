@@ -1,9 +1,12 @@
 import argparse
 import os
 
+import time
+
 import numpy as np
 import pandas
 import trimesh
+from scipy.spatial import cKDTree
 
 
 def strip_obj_materials(obj_path):
@@ -141,18 +144,45 @@ segment_length_sq = np.where(segment_length_sq == 0.0, 1.0, segment_length_sq)
 
 vertices = mesh.vertices
 inside_vertices = np.zeros(len(vertices), dtype=bool)
-chunk_size = 2048
 radius_sq = tube_radius * tube_radius
 
-for start in range(0, len(vertices), chunk_size):
-    verts_chunk = vertices[start:start + chunk_size]
+t0 = time.time()
+print(f"Processing {len(vertices)} vertices against {len(segment_starts)} segments...")
+
+# Step 1: KD-tree on trajectory points to cheaply find candidate vertices
+# Any vertex within tube_radius of the polyline must be within tube_radius of
+# at least one trajectory point (conservative: add half max segment length)
+max_seg_len = np.sqrt(segment_length_sq.max()) if len(segment_length_sq) else 0.0
+search_radius = tube_radius + max_seg_len / 2.0
+traj_tree = cKDTree(traj_points)
+candidate_idx = traj_tree.query_ball_point(vertices, r=search_radius, workers=-1)
+candidate_mask = np.array([len(c) > 0 for c in candidate_idx], dtype=bool)
+candidate_positions = np.where(candidate_mask)[0]
+
+print(f"  KD-tree pre-filter: {len(candidate_positions)}/{len(vertices)} candidates "
+      f"({len(candidate_positions)/len(vertices)*100:.1f}%) — {time.time()-t0:.1f}s")
+
+# Step 2: exact segment-distance test only on candidates (vectorized in chunks)
+cand_verts = vertices[candidate_positions]
+cand_inside = np.zeros(len(cand_verts), dtype=bool)
+chunk_size = 4096
+
+for start in range(0, len(cand_verts), chunk_size):
+    verts_chunk = cand_verts[start:start + chunk_size]
     rel = verts_chunk[:, None, :] - segment_starts[None, :, :]
     proj = np.einsum('ijk,jk->ij', rel, safe_dirs) / segment_length_sq
     proj = np.clip(proj, 0.0, 1.0)
     closest = segment_starts + proj[:, :, None] * safe_dirs
     deltas = verts_chunk[:, None, :] - closest
     min_dist_sq = np.einsum('ijk,ijk->ij', deltas, deltas).min(axis=1)
-    inside_vertices[start:start + chunk_size] = min_dist_sq <= radius_sq
+    cand_inside[start:start + chunk_size] = min_dist_sq <= radius_sq
+
+    elapsed = time.time() - t0
+    done = min(start + chunk_size, len(cand_verts)) / len(cand_verts) * 100
+    print(f"  exact test: {done:5.1f}% — {elapsed:.1f}s elapsed", flush=True)
+
+inside_vertices[candidate_positions] = cand_inside
+print(f"  Done: {inside_vertices.sum()} vertices inside tube — {time.time()-t0:.1f}s total")
 
 faces_mask = inside_vertices[mesh.faces].all(axis=1)
 mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
