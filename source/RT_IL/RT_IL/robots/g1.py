@@ -207,8 +207,8 @@ _LOCOMOTION_JOINTS = {
     # ".*_hip_roll_joint",
     ".*_hip_pitch_joint",
     ".*_knee_joint",
-    ".*_ankle_pitch_joint",
-    ".*_ankle_roll_joint",
+    #".*_ankle_pitch_joint",
+    #".*_ankle_roll_joint",
 }
 G1_HYBRID_ACTION_SCALE = {
     n: (1.0 if n in _LOCOMOTION_JOINTS else scale)
