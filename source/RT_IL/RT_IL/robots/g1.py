@@ -203,8 +203,8 @@ for a in G1_CYLINDER_CFG.actuators.values():
 
 # Hybrid scale: full range (1.0) for locomotion joints, heuristic for the rest
 _LOCOMOTION_JOINTS = {
-    ".*_hip_yaw_joint",
-    ".*_hip_roll_joint",
+    # ".*_hip_yaw_joint",
+    # ".*_hip_roll_joint",
     ".*_hip_pitch_joint",
     ".*_knee_joint",
     ".*_ankle_pitch_joint",
