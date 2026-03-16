@@ -1,12 +1,13 @@
 from isaaclab.utils import configclass
 
-from RT_IL.robots.g1 import G1_ACTION_SCALE, G1_CYLINDER_CFG, G1_VIZ_CFG
+from RT_IL.robots.g1 import G1_CYLINDER_CFG, G1_HYBRID_ACTION_SCALE, G1_VIZ_CFG
 from RT_IL.tasks.tracking.tracking_env_cfg import TrackingEnvCfg
 
 from isaaclab.assets import AssetBaseCfg
 
 import isaaclab.sim as sim_utils
 from RT_IL.tasks.tracking.mdp.commands import MotionCommand
+import RT_IL.tasks.tracking.mdp as mdp
 
 
 class FixedStartMotionCommand(MotionCommand):
@@ -15,7 +16,6 @@ class FixedStartMotionCommand(MotionCommand):
     def _adaptive_sampling(self, env_ids):
         if len(env_ids) == 0:
             return
-
         self.time_steps[env_ids] = 0
 
 
@@ -32,19 +32,19 @@ class G1MeshEnvCfg(TrackingEnvCfg):
                 emissive_color=(0.0, 0.0, 0.0),
                 roughness=0.5,
                 metallic=0.5,
-                opacity=1.0
-            )
+                opacity=1.0,
+            ),
         ),
         init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
-        collision_group=0,  # not really important
+        collision_group=0,
     )
 
     def __post_init__(self):
         super().__post_init__()
 
         self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-        self.actions.joint_pos.scale = G1_ACTION_SCALE
-        self.scene.env_spacing = 10.0
+        self.actions.joint_pos.scale = G1_HYBRID_ACTION_SCALE
+        self.scene.env_spacing = 7.5
         self.commands.motion.anchor_body_name = "torso_link"
         self.commands.motion.body_names = [
             "pelvis",
@@ -64,6 +64,7 @@ class G1MeshEnvCfg(TrackingEnvCfg):
         ]
 
         self.scene.obstacle = self.obstacle
+        # self.commands.motion.class_type = FixedStartMotionCommand
 
 
 @configclass
@@ -82,15 +83,16 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
 
         # Viewer options for filming whole motions externally
-        self.viewer.eye = (-1.5, -2.7, 2.4)
-        self.viewer.lookat = (4.0, -2.3, 0.5)
+        self.viewer.eye = (0.9, 0.5, 2.4)
+        self.viewer.lookat = (0.0, -4.7, 0.0)
         self.viewer.origin_type = "env"
         self.viewer.resolution = (1920, 1080)
         # always start from beginning of motion
         self.commands.motion.class_type = FixedStartMotionCommand
         # reduce termination thresholds to show failures more clearly
-        #self.terminations.anchor_pos = None
+        self.terminations.anchor_pos = None
         self.terminations.anchor_ori = None
-        self.terminations.ee_body_pos = None
+        self.terminations.ee_feet_pos = None
+        self.terminations.ee_hand_pos = None
         self.events.push_robot = None
-        self.episode_length_s = 20.0 # some motions are longer than default 10s
+        # self.episode_length_s = 20.0  # some motions are longer than default 10s

@@ -35,10 +35,10 @@ G1_CYLINDER_CFG = ArticulationCfg(
             angular_damping=0.0,
             max_linear_velocity=1000.0,
             max_angular_velocity=1000.0,
-            max_depenetration_velocity=1.0,
+            max_depenetration_velocity=0.1,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=True, solver_position_iteration_count=8, solver_velocity_iteration_count=4
+            enabled_self_collisions=True, solver_position_iteration_count=16, solver_velocity_iteration_count=8
         ),
         joint_drive=sim_utils.UrdfConverterCfg.JointDriveCfg(
             gains=sim_utils.UrdfConverterCfg.JointDriveCfg.PDGainsCfg(stiffness=0, damping=0)
@@ -200,3 +200,17 @@ for a in G1_CYLINDER_CFG.actuators.values():
     for n in names:
         if n in e and n in s and s[n]:
             G1_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
+
+# Hybrid scale: full range (1.0) for locomotion joints, heuristic for the rest
+_LOCOMOTION_JOINTS = {
+    ".*_hip_yaw_joint",
+    ".*_hip_roll_joint",
+    ".*_hip_pitch_joint",
+    ".*_knee_joint",
+    ".*_ankle_pitch_joint",
+    ".*_ankle_roll_joint",
+}
+G1_HYBRID_ACTION_SCALE = {
+    n: (1.0 if n in _LOCOMOTION_JOINTS else scale)
+    for n, scale in G1_ACTION_SCALE.items()
+}

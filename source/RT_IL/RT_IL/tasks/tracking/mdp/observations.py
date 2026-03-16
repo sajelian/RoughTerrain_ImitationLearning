@@ -91,3 +91,58 @@ def motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor
     )
     mat = matrix_from_quat(ori)
     return mat[..., :2].reshape(mat.shape[0], -1)
+
+
+def motion_body_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """Reference body positions (absolute world frame) expressed in the robot anchor frame.
+
+    Gives the policy/critic explicit per-body targets in a frame it can act on,
+    consistent with the absolute world-frame position rewards.
+    """
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    num_bodies = len(command.cfg.body_names)
+    anchor_quat = _safe_quat(command.robot_anchor_quat_w)
+    pos_b, _ = subtract_frame_transforms(
+        command.robot_anchor_pos_w[:, None, :].repeat(1, num_bodies, 1),
+        anchor_quat[:, None, :].repeat(1, num_bodies, 1),
+        command.body_pos_w,
+        _safe_quat(command.body_quat_w),
+    )
+    return pos_b.view(env.num_envs, -1)
+
+
+def motion_body_pos_error_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """Absolute world-frame body position error expressed in the robot anchor frame.
+
+    Returns (ref_pos_w - actual_pos_w) rotated into the robot's body frame
+    for all tracked bodies, giving the policy the absolute correction vectors
+    it needs to reach terrain-locked targets.
+    """
+    from isaaclab.utils.math import quat_rotate_inverse
+
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    num_bodies = len(command.cfg.body_names)
+    # world-frame error
+    error_w = command.body_pos_w - command.robot_body_pos_w
+    # rotate into robot anchor frame
+    anchor_quat = _safe_quat(command.robot_anchor_quat_w)
+    error_b = quat_rotate_inverse(
+        anchor_quat[:, None, :].expand(-1, num_bodies, -1).reshape(-1, 4),
+        error_w.reshape(-1, 3),
+    ).reshape(env.num_envs, num_bodies, 3)
+    return error_b.view(env.num_envs, -1)
+
+
+def motion_body_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """Reference body orientations (absolute world frame) expressed in the robot anchor frame."""
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    num_bodies = len(command.cfg.body_names)
+    anchor_quat = _safe_quat(command.robot_anchor_quat_w)
+    _, ori_b = subtract_frame_transforms(
+        command.robot_anchor_pos_w[:, None, :].repeat(1, num_bodies, 1),
+        anchor_quat[:, None, :].repeat(1, num_bodies, 1),
+        command.body_pos_w,
+        _safe_quat(command.body_quat_w),
+    )
+    mat = matrix_from_quat(ori_b)
+    return mat[..., :2].reshape(mat.shape[0], -1)

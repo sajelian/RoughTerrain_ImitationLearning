@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import MISSING
 
 import isaaclab.sim as sim_utils
-from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
+from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
@@ -13,7 +14,9 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import ContactSensorCfg
-from isaaclab.terrains import TerrainImporterCfg
+from isaaclab.terrains import TerrainGeneratorCfg, TerrainImporterCfg
+import isaaclab.terrains as terrain_gen
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 
 from isaaclab.sensors.ray_caster import RayCasterCfg, MultiMeshRayCasterCfg, patterns
 
@@ -39,13 +42,24 @@ VELOCITY_RANGE = {
     "yaw": (-0.78, 0.78),
 }
 
+# Smaller push range: absolute tracking means large pushes cause irrecoverable
+# xy drift from the reference path with no reset, so keep perturbations small.
+PUSH_VELOCITY_RANGE = {
+    "x": (-0.15, 0.15),
+    "y": (-0.15, 0.15),
+    "z": (-0.05, 0.05),
+    "roll": (-0.15, 0.15),
+    "pitch": (-0.15, 0.15),
+    "yaw": (-0.25, 0.25),
+}
+
 
 @configclass
 class MySceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a legged robot."""
 
     # ground terrain
-    terrain = TerrainImporterCfg(
+    ground = TerrainImporterCfg(
         prim_path="/World/ground",
         terrain_type="plane",
         collision_group=-1,
@@ -146,11 +160,14 @@ class ObservationsCfg:
         motion_anchor_ori_b = ObsTerm(
             func=mdp.motion_anchor_ori_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
         )
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5))
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5))
-        actions = ObsTerm(func=mdp.last_action)
+        motion_body_pos_b = ObsTerm(
+            func=mdp.motion_body_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
+        )
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=10)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2), history_length=10)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01), history_length=10)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=10)
+        actions = ObsTerm(func=mdp.last_action, history_length=10)
 
         height_scan = ObsTerm(
             func=mdp.height_scan,
@@ -165,22 +182,31 @@ class ObservationsCfg:
 
     @configclass
     class PrivilegedCfg(ObsGroup):
+        root_pos = ObsTerm(func=mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("robot")})
+        root_quat = ObsTerm(func=mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("robot")})
         command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
         motion_anchor_pos_b = ObsTerm(func=mdp.motion_anchor_pos_b, params={"command_name": "motion"})
         motion_anchor_ori_b = ObsTerm(func=mdp.motion_anchor_ori_b, params={"command_name": "motion"})
         body_pos = ObsTerm(func=mdp.robot_body_pos_b, params={"command_name": "motion"})
         body_ori = ObsTerm(func=mdp.robot_body_ori_b, params={"command_name": "motion"})
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
-        actions = ObsTerm(func=mdp.last_action)
+        motion_body_pos_b = ObsTerm(func=mdp.motion_body_pos_b, params={"command_name": "motion"})
+        motion_body_ori_b = ObsTerm(func=mdp.motion_body_ori_b, params={"command_name": "motion"})
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, history_length=10)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, history_length=10)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, history_length=10)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, history_length=10)
+        actions = ObsTerm(func=mdp.last_action, history_length=10)
 
         height_scan = ObsTerm(
             func=mdp.height_scan,
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-            noise=Unoise(n_min=-0.1, n_max=0.1),
+            # noise=Unoise(n_min=-0.1, n_max=0.1),
             clip=(-1.0, 1.0),
+        )
+
+        ankle_forces = ObsTerm(
+            func=mdp.body_incoming_wrench,
+            params={"asset_cfg": SceneEntityCfg("robot", body_names=["left_ankle_roll_link", "right_ankle_roll_link"])},
         )
 
     # observation groups
@@ -229,7 +255,7 @@ class EventCfg:
         func=mdp.push_by_setting_velocity,
         mode="interval",
         interval_range_s=(1.0, 3.0),
-        params={"velocity_range": VELOCITY_RANGE},
+        params={"velocity_range": PUSH_VELOCITY_RANGE},
     )
 
 
@@ -237,14 +263,40 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
+    motion_global_feet_body_pos = RewTerm(
+        func=mdp.motion_global_body_position_error_exp,
+        weight=4.0,
+        params={
+            "command_name": "motion",
+            "std": 0.3,
+            "body_names": [
+                "left_ankle_roll_link",
+                "right_ankle_roll_link",
+            ],
+        },
+    )
+
+    motion_global_hand_body_pos = RewTerm(
+        func=mdp.motion_global_body_position_error_exp,
+        weight=1.0,
+        params={
+            "command_name": "motion",
+            "std": 0.25,
+            "body_names": [
+                "left_wrist_yaw_link",
+                "right_wrist_yaw_link",
+            ],
+        },
+    )
+
     motion_global_anchor_pos = RewTerm(
         func=mdp.motion_global_anchor_position_error_exp,
-        weight=0.5,
+        weight=1.0,
         params={"command_name": "motion", "std": 0.3},
     )
     motion_global_anchor_ori = RewTerm(
         func=mdp.motion_global_anchor_orientation_error_exp,
-        weight=0.5,
+        weight=1.0,
         params={"command_name": "motion", "std": 0.4},
     )
     motion_body_pos = RewTerm(
@@ -275,7 +327,7 @@ class RewardsCfg:
     )
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
-        weight=-0.1,
+        weight=-0.1 ,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
@@ -294,24 +346,28 @@ class TerminationsCfg:
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     anchor_pos = DoneTerm(
-        func=mdp.bad_anchor_pos_z_only,
-        params={"command_name": "motion", "threshold": 0.4}, # 0.25
+        func=mdp.bad_anchor_pos,
+        params={"command_name": "motion", "threshold_xy": 0.75, "threshold_z": 0.3},  # full 3D norm: catches xy drift under absolute tracking
     )
     anchor_ori = DoneTerm(
         func=mdp.bad_anchor_ori,
         params={"asset_cfg": SceneEntityCfg("robot"), "command_name": "motion", "threshold": 0.8},
     )
-    ee_body_pos = DoneTerm(
+    ee_feet_pos = DoneTerm(
+        func=mdp.bad_motion_body_pos_xy_z,
+        params={
+            "command_name": "motion",
+            "threshold_xy": 0.25,
+            "threshold_z": 0.25,
+            "body_names": ["left_ankle_roll_link", "right_ankle_roll_link"],
+        },
+    )
+    ee_hand_pos = DoneTerm(
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
-            "threshold": 0.25,
-            "body_names": [
-                "left_ankle_roll_link",
-                "right_ankle_roll_link",
-                "left_wrist_yaw_link",
-                "right_wrist_yaw_link",
-            ],
+            "threshold": 0.8,
+            "body_names": ["left_wrist_yaw_link", "right_wrist_yaw_link"],
         },
     )
 
@@ -319,15 +375,12 @@ class TerminationsCfg:
 @configclass
 class CurriculumCfg:
     """Curriculum terms for the MDP."""
-
     pass
 
 
 ##
 # Environment configuration
 ##
-
-
 @configclass
 class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
@@ -352,7 +405,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         # simulation settings
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation
-        self.sim.physics_material = self.scene.terrain.physics_material
+        self.sim.physics_material = self.scene.ground.physics_material
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**17
         # viewer settings
         self.viewer.eye = (1.5, 1.5, 1.5)
