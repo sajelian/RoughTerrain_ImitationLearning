@@ -63,7 +63,12 @@ PUSH_VELOCITY_RANGE = {
     "yaw": (-0.25, 0.25),
 }
 
+PROPIO_HISTORY_LEN = 5
 
+
+##
+# Scene definition
+##
 @configclass
 class MySceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a legged robot."""
@@ -135,8 +140,6 @@ class MySceneCfg(InteractiveSceneCfg):
 ##
 # MDP settings
 ##
-
-
 @configclass
 class CommandsCfg:
     """Command specifications for the MDP."""
@@ -184,11 +187,11 @@ class ObservationsCfg:
         motion_body_pos_b = ObsTerm(
             func=mdp.motion_body_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
         )
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=10)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2), history_length=10)
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01), history_length=10)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=10)
-        actions = ObsTerm(func=mdp.last_action, history_length=10)
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=PROPIO_HISTORY_LEN)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2), history_length=PROPIO_HISTORY_LEN)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01), history_length=PROPIO_HISTORY_LEN)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=PROPIO_HISTORY_LEN)
+        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_LEN)
 
         height_scan = ObsTerm(
             func=mdp.height_scan,
@@ -212,11 +215,11 @@ class ObservationsCfg:
         body_ori = ObsTerm(func=mdp.robot_body_ori_b, params={"command_name": "motion"})
         motion_body_pos_b = ObsTerm(func=mdp.motion_body_pos_b, params={"command_name": "motion"})
         motion_body_ori_b = ObsTerm(func=mdp.motion_body_ori_b, params={"command_name": "motion"})
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, history_length=10)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, history_length=10)
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, history_length=10)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, history_length=10)
-        actions = ObsTerm(func=mdp.last_action, history_length=10)
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, history_length=PROPIO_HISTORY_LEN)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, history_length=PROPIO_HISTORY_LEN)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, history_length=PROPIO_HISTORY_LEN)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, history_length=PROPIO_HISTORY_LEN)
+        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_LEN)
 
         height_scan = ObsTerm(
             func=mdp.height_scan,
@@ -312,7 +315,7 @@ class RewardsCfg:
 
     motion_global_anchor_pos = RewTerm(
         func=mdp.motion_global_anchor_position_error_exp,
-        weight=1.0,
+        weight=2.0,
         params={"command_name": "motion", "std": 0.3},
     )
     motion_global_anchor_ori = RewTerm(
