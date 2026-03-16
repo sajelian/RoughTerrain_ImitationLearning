@@ -33,13 +33,13 @@ class G1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 
 @configclass
 class G1MeshPPORunnerCfg(RslRlOnPolicyRunnerCfg):
-    num_steps_per_env = 48 # TODO not sure about this
+    num_steps_per_env = 24
     max_iterations = 50000
     save_interval = 500
     experiment_name = "g1_mimic_mesh"
     empirical_normalization = True
     policy = RslRlPpoActorCriticCfg(
-        init_noise_std=1.0,
+        init_noise_std=1.2,  # TODO not sure about this
         actor_hidden_dims=[1024, 512, 256, 128],
         critic_hidden_dims=[1024, 512, 256, 128],
         activation="elu",
@@ -50,7 +50,7 @@ class G1MeshPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         clip_param=0.2,
         entropy_coef=0.005,
         num_learning_epochs=5,
-        num_mini_batches=12, # TODO not sure about this
+        num_mini_batches=12,  # TODO not sure about this
         learning_rate=1.0e-3,
         schedule="adaptive",
         gamma=0.99,
