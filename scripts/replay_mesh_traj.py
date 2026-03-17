@@ -140,6 +140,8 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     sim.set_camera_view((-3.5, 0, 2.0), (0, -1, 0.1))
     while simulation_app.is_running():
         time_steps += 1
+        # log time steps to console
+        print(f"Time step: {time_steps[0]}")
         reset_ids = time_steps >= motion.time_step_total
         time_steps[reset_ids] = 0
 
