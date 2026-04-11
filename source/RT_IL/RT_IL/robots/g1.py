@@ -38,7 +38,7 @@ G1_CYLINDER_CFG = ArticulationCfg(
             max_depenetration_velocity=0.1,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=True, solver_position_iteration_count=16, solver_velocity_iteration_count=8
+            enabled_self_collisions=True, solver_position_iteration_count=8, solver_velocity_iteration_count=4
         ),
         joint_drive=sim_utils.UrdfConverterCfg.JointDriveCfg(
             gains=sim_utils.UrdfConverterCfg.JointDriveCfg.PDGainsCfg(stiffness=0, damping=0)
@@ -207,8 +207,10 @@ _LOCOMOTION_JOINTS = {
     # ".*_hip_roll_joint",
     ".*_hip_pitch_joint",
     ".*_knee_joint",
-    #".*_ankle_pitch_joint",
-    #".*_ankle_roll_joint",
+    "waist_yaw_joint",
+    "waist_pitch_joint",
+    ".*_ankle_pitch_joint",
+    # ".*_ankle_roll_joint",
 }
 G1_HYBRID_ACTION_SCALE = {
     n: (1.0 if n in _LOCOMOTION_JOINTS else scale)

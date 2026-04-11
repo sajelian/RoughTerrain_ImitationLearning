@@ -39,7 +39,7 @@ class G1MeshPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     experiment_name = "g1_mimic_mesh"
     empirical_normalization = True
     policy = RslRlPpoActorCriticCfg(
-        init_noise_std=1.2,  # TODO not sure about this
+        init_noise_std=1.0,  # TODO not sure about this
         actor_hidden_dims=[1024, 512, 256, 128],
         critic_hidden_dims=[1024, 512, 256, 128],
         activation="elu",
@@ -48,7 +48,7 @@ class G1MeshPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         value_loss_coef=1.0,
         use_clipped_value_loss=True,
         clip_param=0.2,
-        entropy_coef=0.005,
+        entropy_coef=0.005,  # TODO not sure about this
         num_learning_epochs=5,
         num_mini_batches=12,  # TODO not sure about this
         learning_rate=1.0e-3,

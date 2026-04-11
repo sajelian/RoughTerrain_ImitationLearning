@@ -249,7 +249,7 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
     "${CROPPED_OBJ}" \
     "${USD_FILE}" \
     --make-instanceable \
-    --collision-approximation sdf \
+    --collision-approximation triangleMesh \
     ${HEADLESS_FLAG}
 
   [[ -f "${USD_FILE}" ]] || { echo "Expected USD not found: ${USD_FILE}" >&2; exit 1; }

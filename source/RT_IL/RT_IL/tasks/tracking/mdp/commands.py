@@ -46,6 +46,31 @@ class MotionLoader:
         self._body_ang_vel_w = torch.tensor(data["body_ang_vel_w"], dtype=torch.float32, device=device)
         self.time_step_total = self.joint_pos.shape[0]
 
+        if "rsi_mask" in data:
+            self.rsi_mask = torch.tensor(data["rsi_mask"], dtype=torch.bool, device=device)
+            valid_count = int(self.rsi_mask.sum())
+            print(
+                f"[RSI] Valid frames: {valid_count}/{self.time_step_total}"
+                f" ({100 * valid_count / self.time_step_total:.1f}%)"
+            )
+        else:
+            self.rsi_mask = None
+
+        # Foot contact schedule (optional)
+        if "foot_contact_left" in data and "foot_contact_right" in data:
+            self.foot_contact_left = torch.tensor(data["foot_contact_left"], dtype=torch.bool, device=device)
+            self.foot_contact_right = torch.tensor(data["foot_contact_right"], dtype=torch.bool, device=device)
+            self.foot_contact_mask = torch.tensor(data["foot_contact_mask"], dtype=torch.bool, device=device)
+            valid_count = int(self.foot_contact_mask.sum())
+            print(
+                f"[FOOTLOCK] Loaded contact schedule. "
+                f"Valid: {valid_count}/{self.time_step_total} ({100 * valid_count / self.time_step_total:.1f}%)"
+            )
+        else:
+            self.foot_contact_left = None
+            self.foot_contact_right = None
+            self.foot_contact_mask = None
+
         # Compute body indexes for motion data: use stored body_names if available,
         # otherwise fall back to robot body indexes (works when robot matches motion data).
         if "body_names" in data:
@@ -99,6 +124,11 @@ class MotionCommand(CommandTerm):
         self.motion = MotionLoader(
             self.cfg.motion_file, self.cfg.body_names, self.body_indexes, device=self.device
         )
+        if self.motion.rsi_mask is not None:
+            self._valid_rsi_indices = torch.where(self.motion.rsi_mask)[0]
+            assert len(self._valid_rsi_indices) > 0, "No valid RSI frames in motion data!"
+        else:
+            self._valid_rsi_indices = None
         self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         self.body_pos_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 3, device=self.device)
         self.body_quat_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 4, device=self.device)
@@ -167,6 +197,21 @@ class MotionCommand(CommandTerm):
     @property
     def anchor_ang_vel_w(self) -> torch.Tensor:
         return self.motion.body_ang_vel_w[self.time_steps, self.motion_anchor_body_index]
+
+    @property
+    def foot_contact_schedule(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None:
+        """Reference foot contact state at current timestep.
+
+        Returns (left_contact, right_contact, valid_mask) each of shape (num_envs,) bool,
+        or None if the motion data has no footlock information.
+        """
+        if self.motion.foot_contact_left is None:
+            return None
+        return (
+            self.motion.foot_contact_left[self.time_steps],
+            self.motion.foot_contact_right[self.time_steps],
+            self.motion.foot_contact_mask[self.time_steps],
+        )
 
     @property
     def robot_joint_pos(self) -> torch.Tensor:
@@ -267,10 +312,29 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_top1_prob"][:] = pmax
         self.metrics["sampling_top1_bin"][:] = imax.float() / self.bin_count
 
+    def _snap_to_valid_rsi(self, env_ids: Sequence[int]):
+        """Snap timesteps that land on invalid RSI frames to the nearest valid frame."""
+        assert self.motion.rsi_mask is not None and self._valid_rsi_indices is not None
+        sampled_ts = self.time_steps[env_ids]
+        invalid = ~self.motion.rsi_mask[sampled_ts]
+        if not invalid.any():
+            return
+        valid = self._valid_rsi_indices
+        invalid_ts = sampled_ts[invalid]
+        idx = torch.searchsorted(valid, invalid_ts)
+        idx_right = idx.clamp(max=len(valid) - 1)
+        idx_left = (idx - 1).clamp(min=0)
+        dist_right = (valid[idx_right] - invalid_ts).abs()
+        dist_left = (valid[idx_left] - invalid_ts).abs()
+        nearest = torch.where(dist_left <= dist_right, valid[idx_left], valid[idx_right])
+        self.time_steps[env_ids[invalid]] = nearest
+
     def _resample_command(self, env_ids: Sequence[int]):
         if len(env_ids) == 0:
             return
         self._adaptive_sampling(env_ids)
+        if self._valid_rsi_indices is not None:
+            self._snap_to_valid_rsi(env_ids)
 
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
@@ -297,6 +361,7 @@ class MotionCommand(CommandTerm):
         joint_pos[env_ids] = torch.clip(
             joint_pos[env_ids], soft_joint_pos_limits[:, :, 0], soft_joint_pos_limits[:, :, 1]
         )
+        # write to sim
         self.robot.write_joint_state_to_sim(joint_pos[env_ids], joint_vel[env_ids], env_ids=env_ids)
         self.robot.write_root_state_to_sim(
             torch.cat([root_pos[env_ids], root_ori[env_ids], root_lin_vel[env_ids], root_ang_vel[env_ids]], dim=-1),

@@ -103,6 +103,139 @@ def motion_global_body_angular_velocity_error_exp(
     return torch.exp(-error.mean(-1) / std**2)
 
 
+def foot_contact_schedule(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    sensor_cfg: SceneEntityCfg,
+    std_normalized: float = 0.5,  # in units of body-weight-force (m*g), NOT raw Newtons
+    robot_mass: float = 35.0,  # G1 mass in kg
+    false_contact_weight: float = 0.7,  # weight for false contact penalty (swing but grounded)
+    missed_contact_weight: float = 0.3,  # weight for missed contact penalty (stance but airborne)
+) -> torch.Tensor:
+    """Reward for matching the reference foot contact schedule.
+
+    Uses net contact force magnitude as a continuous proxy for binary contact state.
+    Asymmetric weighting penalizes false contacts (foot down during swing) harder
+    than missed contacts (foot up during stance), reflecting their different physical
+    consequences for gait stability.
+
+    Forces are normalized by body-weight-force (m*g) before the Gaussian, making
+    std_normalized dimensionless and consistent across motion types (walking, stairs,
+    long strides etc.). This works because peak contact forces in legged locomotion
+    scale with body weight regardless of motion type — so BW is the natural unit.
+
+    std_normalized=0.5 means the reward curve transitions around 0.5 * m*g ≈ 170N
+    for the G1. At exactly that force:
+        exp(-(0.5)^2 / (0.5)^2) = exp(-1) ≈ 0.37  → sits in the informative middle
+
+    The two reward components:
+      - Contact expected  (ref=True):  1 - exp(-F_norm²/std²)  → 0 when no force, 1 when high force
+      - No-contact expected (ref=False): exp(-F_norm²/std²)    → 1 when no force, 0 when high force
+
+    Args:
+        command_name:          Name of the MotionCommand term.
+        sensor_cfg:            ContactSensor config with body_ids for [left_foot, right_foot].
+        std_normalized:        Gaussian width in body-weight units. 0.5 = transition at ~half BW.
+                               Increase for more leniency, decrease for stricter contact matching.
+        robot_mass:            Robot mass in kg, used to compute body-weight-force for normalization.
+        false_contact_weight:  Relative penalty for foot grounded during swing phase.
+                               Higher = agent punished harder for not lifting feet.
+        missed_contact_weight: Relative penalty for foot airborne during stance phase.
+                               Lower = agent gets more slack on landing timing.
+    """
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    schedule = command.foot_contact_schedule
+    if schedule is None:
+        return torch.ones(env.num_envs, device=env.device)
+
+    ref_left, ref_right, valid_mask = schedule
+
+    # --- Contact force magnitude ---
+    # Max over history window for robustness against single-frame noise
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    force_mag = (
+        contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :]
+        .norm(dim=-1)  # (num_envs, history, 2)
+        .max(dim=1)[0]  # (num_envs, 2) — max over history
+    )
+
+    # --- Normalize forces by body-weight-force ---
+    # This makes the reward scale-invariant across motion types:
+    # walking peaks ~1.3 BW, stairs descent ~2.0 BW — both handled by the same std_normalized
+    GRAVITY = 9.81  # m/s²
+    body_weight_force = robot_mass * GRAVITY  # G1: 35 * 9.81 ≈ 343 N
+    force_normalized = force_mag / body_weight_force  # dimensionless, typically 0.0–2.0
+
+    # --- Gaussian reward components (now operating on normalized force) ---
+    # exp_term → 1 when force≈0 (airborne), → 0 when force is large (grounded)
+    exp_term = torch.exp(-force_normalized.square() / (std_normalized**2))
+
+    contact_reward = 1.0 - exp_term  # high reward when foot IS on ground
+    no_contact_reward = exp_term  # high reward when foot IS in air
+
+    # ref=True means stance phase (contact expected), ref=False means swing (no contact)
+    ref = torch.stack([ref_left, ref_right], dim=-1).float()  # (num_envs, 2)
+
+    # --- Asymmetric penalty scaling ---
+    # Base reward: 1 when matching reference, 0 when not
+    correct_reward = ref * contact_reward + (1 - ref) * no_contact_reward
+
+    # Scale the penalty asymmetrically: different cost for different failure modes
+    penalty = 1.0 - correct_reward
+    penalty_weight = ref * missed_contact_weight + (1 - ref) * false_contact_weight
+    reward_per_foot = 1.0 - penalty_weight * penalty
+
+    # --- Average across feet, mask invalid frames ---
+    reward = reward_per_foot.mean(dim=-1)
+    # Invalid frames (no footlock data for this motion clip) get neutral reward 1.0
+    reward = torch.where(valid_mask, reward, torch.ones_like(reward))
+
+    return reward
+
+
+def foot_contact_schedule_sparse(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    sensor_cfg: SceneEntityCfg,
+    std_normalized: float = 0.5,
+    robot_mass: float = 35.0,
+) -> torch.Tensor:
+    """Sparse reward that only fires when feet match the reference contact schedule.
+
+    Returns 0 by default; the agent earns reward only for correct contacts.
+    With weight=4.0: both correct → 4.0, one correct → 2.0, both wrong → 0.0.
+    """
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    schedule = command.foot_contact_schedule
+    if schedule is None:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    ref_left, ref_right, valid_mask = schedule
+
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    force_mag = (
+        contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :]
+        .norm(dim=-1)
+        .max(dim=1)[0]
+    )
+
+    GRAVITY = 9.81
+    body_weight_force = robot_mass * GRAVITY
+    force_normalized = force_mag / body_weight_force
+
+    exp_term = torch.exp(-force_normalized.square() / (std_normalized**2))
+    contact_reward = 1.0 - exp_term
+    no_contact_reward = exp_term
+
+    ref = torch.stack([ref_left, ref_right], dim=-1).float()
+    correct_reward = ref * contact_reward + (1 - ref) * no_contact_reward
+
+    reward = correct_reward.mean(dim=-1)
+    reward = torch.where(valid_mask, reward, torch.zeros_like(reward))
+
+    return reward
+
+
 def feet_contact_time(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, threshold: float) -> torch.Tensor:
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
     first_air = contact_sensor.compute_first_air(env.step_dt, env.physics_dt)[:, sensor_cfg.body_ids]

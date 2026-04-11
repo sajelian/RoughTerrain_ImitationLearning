@@ -175,19 +175,21 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
-
+        # TODO check if this training setup still works without the global infos
         # observation terms (order preserved)
         command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
-        motion_anchor_pos_b = ObsTerm(
-            func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.25, n_max=0.25)
-        )
+        # motion_anchor_pos_b = ObsTerm(
+        #     func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.25, n_max=0.25)
+        # )
         motion_anchor_ori_b = ObsTerm(
             func=mdp.motion_anchor_ori_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
         )
-        motion_body_pos_b = ObsTerm(
-            func=mdp.motion_body_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
-        )
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=PROPIO_HISTORY_LEN)
+        # motion_body_pos_b = ObsTerm(
+        #     func=mdp.motion_body_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
+        # )
+        projected_gravity = ObsTerm(func=mdp.projected_gravity, noise=Unoise(n_min=-0.05, n_max=0.05))
+        # TODO check if it even works without base_lin_vel...
+        # base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=PROPIO_HISTORY_LEN)
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2), history_length=PROPIO_HISTORY_LEN)
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01), history_length=PROPIO_HISTORY_LEN)
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=PROPIO_HISTORY_LEN)
@@ -343,10 +345,25 @@ class RewardsCfg:
         weight=1.0,
         params={"command_name": "motion", "std": 3.14},
     )
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-1e-1)
+    # TODO tune this to match the actual forces observed in the reference
+    foot_contact_schedule = RewTerm(
+        func=mdp.foot_contact_schedule_sparse,
+        weight=4.0,
+        params={
+            "command_name": "motion",
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces",
+                body_names=["left_ankle_roll_link", "right_ankle_roll_link"],
+            ),
+            "std_normalized": 0.5,
+            "robot_mass": 35.0,
+        },
+    )
+    # TODO check if this helps remove the shaky behavior
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-3e-1)
     joint_limit = RewTerm(
         func=mdp.joint_pos_limits,
-        weight=-10.0,
+        weight=-5.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
     )
     undesired_contacts = RewTerm(
@@ -381,8 +398,8 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_xy_z,
         params={
             "command_name": "motion",
-            "threshold_xy": 0.25,
-            "threshold_z": 0.25,
+            "threshold_xy": 0.35,
+            "threshold_z": 0.35,
             "body_names": ["left_ankle_roll_link", "right_ankle_roll_link"],
         },
     )
@@ -425,14 +442,14 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 4
-        self.episode_length_s = 10.0
+        self.episode_length_s = 8.5  # this should be <= clip length
         # simulation settings
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation
         self.sim.physics_material = self.scene.terrain.physics_material
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**17
         # depends on mesh -> needs to scale with num_envs
-        self.sim.physx.gpu_collision_stack_size = 3 * 2**15 * self.scene.num_envs
+        self.sim.physx.gpu_collision_stack_size = 2.5 * 2**15 * self.scene.num_envs
         # viewer settings
         self.viewer.eye = (1.5, 1.5, 1.5)
         self.viewer.origin_type = "asset_root"

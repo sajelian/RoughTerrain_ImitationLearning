@@ -65,23 +65,18 @@ class MySceneCfg(InteractiveSceneCfg):
     obstacle: AssetBaseCfg = MISSING
 
     # sensors
-    height_scanner = MultiMeshRayCasterCfg(
+    height_scanner = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/torso_link",
         offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
         ray_alignment="yaw",
         pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=(1.6, 1.0)),
         debug_vis=True,
         mesh_prim_paths=[
-            "/World/ground",
-            MultiMeshRayCasterCfg.RaycastTargetCfg(
-                target_prim_expr="{ENV_REGEX_NS}/obstacle",
-                is_shared=True,
-                track_mesh_transforms=False,
-            ),
+            "/World/ground"
         ],
     )
 
-    contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True, debug_vis=True, force_threshold=5.0)
+    contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
 
     # lights
     sky_light = AssetBaseCfg(
@@ -120,8 +115,7 @@ class CommandsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    joint_pos = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], use_default_offset=True)
-
+    joint_pos = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], use_default_offset=True, scale=0.5)
 
 @configclass
 class ObservationsCfg:
@@ -290,13 +284,7 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     base_contact = DoneTerm(
         func=mdp.illegal_contact,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="base"), "threshold": 5.0},
-    )
-
-    # this works well to mitigate exploitation on non-bipedal gait modes ("sitting on thighs")
-    thigh_contact = DoneTerm(
-        func=mdp.illegal_contact,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*_hip_.*_link"]), "threshold": 5.0},
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="base"), "threshold": 1.0},
     )
 
 

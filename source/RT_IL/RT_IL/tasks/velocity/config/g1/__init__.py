@@ -64,4 +64,43 @@ gym.register(
     },
 )
 
+gym.register(
+    id="Template-Isaac-Velocity-Rough-Unitree-G1-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.rough_rsl_cfg:UnitreeG1RoughEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:G1RoughPPORunnerCfg",
+    },
+)
+
+gym.register(
+    id="Template-Isaac-Velocity-Rough-Unitree-G1-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.rough_rsl_cfg:UnitreeG1RoughEnvCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:G1RoughPPORunnerCfg",
+    },
+)
+
+gym.register(
+    id="Template-Isaac-Velocity-Rough-Unitree-G1-Distillation-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.rough_rsl_cfg:UnitreeG1RoughEnvCfg_DISTILLATION",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_distillation_cfg:UnitreeG1RoughDistillationRunnerCfg",
+    },
+)
+
+gym.register(
+    id="Template-Isaac-Velocity-Rough-Unitree-G1-Distillation-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.rough_rsl_cfg:UnitreeG1RoughEnvCfg_DISTILLATIONPLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_distillation_cfg:UnitreeG1RoughDistillationRunnerCfg",
+    },
+)
 

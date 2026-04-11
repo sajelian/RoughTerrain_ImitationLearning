@@ -83,14 +83,15 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
 
         # Viewer options for filming whole motions externally
-        self.viewer.eye = (0.9, 0.5, 2.4)
-        self.viewer.lookat = (0.0, -4.7, 0.0)
-        self.viewer.origin_type = "env"
+        #self.viewer.eye = (0.9, 0.5, 2.4)
+        #self.viewer.lookat = (0.0, -4.7, 0.0)
+        #self.viewer.origin_type = "asset_root"
+        self.viewer.eye = (2.5, 2.5, 2.5)
         self.viewer.resolution = (1920, 1080)
         # always start from beginning of motion
         self.commands.motion.class_type = FixedStartMotionCommand
         # reduce termination thresholds to show failures more clearly
-        self.terminations.anchor_pos = None
+        # self.terminations.anchor_pos = None
         self.terminations.anchor_ori = None
         self.terminations.ee_feet_pos = None
         self.terminations.ee_hand_pos = None

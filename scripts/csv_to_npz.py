@@ -30,6 +30,22 @@ parser.add_argument(
 )
 parser.add_argument("--output_name", type=str, required=True, help="The name of the motion npz file.")
 parser.add_argument("--output_fps", type=int, default=50, help="The fps of the output motion.")
+parser.add_argument(
+    "--raw_npz",
+    type=str,
+    default=None,
+    help="Path to raw motion NPZ containing egomc_footlock_LeftFoot / egomc_footlock_RightFoot.",
+)
+parser.add_argument(
+    "--raw_npz_frame_range",
+    nargs=2,
+    type=int,
+    metavar=("START", "END"),
+    help=(
+        "Frame range into the raw NPZ for footlock extraction (1-indexed, inclusive). "
+        "Use this when --frame_range applies to the CSV but the raw NPZ needs a different slice."
+    ),
+)
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -41,6 +57,63 @@ app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 """Rest everything follows."""
+
+
+def _resample_footlocks(raw_npz_path: str, input_fps: int, output_fps: int, output_frames: int, frame_range=None):
+    """Resample binary footlock masks from raw NPZ (at input_fps) to output_fps.
+
+    Uses nearest-neighbor interpolation so the result stays binary.
+    Returns (foot_contact_left, foot_contact_right, foot_contact_mask) as numpy bool arrays
+    of shape (output_frames,).  foot_contact_mask is False for frames where both raw
+    footlocks are simultaneously off for an implausibly long run (>0.5s), indicating
+    missing/invalid data.
+    """
+    raw = np.load(raw_npz_path, allow_pickle=True)
+    left = raw["egomc_footlock_LeftFoot"].astype(bool)
+    right = raw["egomc_footlock_RightFoot"].astype(bool)
+
+    if frame_range is not None:
+        # frame_range is 1-indexed inclusive; raw data is 0-indexed
+        start = frame_range[0] - 1
+        end = frame_range[1]
+        left = left[start:end]
+        right = right[start:end]
+
+    raw_frames = len(left)
+    input_dt = 1.0 / input_fps
+    output_dt = 1.0 / output_fps
+    duration = (raw_frames - 1) * input_dt
+
+    # Build output time grid and map to nearest raw frame (nearest-neighbor)
+    out_times = np.arange(0, duration, output_dt)[:output_frames]
+    raw_indices = np.round(out_times / input_dt).astype(int)
+    raw_indices = np.clip(raw_indices, 0, raw_frames - 1)
+
+    left_out = left[raw_indices]
+    right_out = right[raw_indices]
+
+    # Validity mask: mark frames where both feet are off for >0.5s as invalid
+    both_off = ~left_out & ~right_out
+    min_run = max(1, int(0.5 * output_fps))  # 0.5s worth of frames
+    mask = np.ones(output_frames, dtype=bool)
+    run_start = None
+    for i in range(output_frames):
+        if both_off[i]:
+            if run_start is None:
+                run_start = i
+        else:
+            if run_start is not None and (i - run_start) >= min_run:
+                mask[run_start:i] = False
+            run_start = None
+    if run_start is not None and (output_frames - run_start) >= min_run:
+        mask[run_start:output_frames] = False
+
+    valid_count = int(mask.sum())
+    print(
+        f"[FOOTLOCK] Resampled {raw_frames} -> {output_frames} frames. "
+        f"Valid: {valid_count}/{output_frames} ({100 * valid_count / output_frames:.1f}%)"
+    )
+    return left_out, right_out, mask
 
 import torch
 
@@ -315,6 +388,18 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joi
                 "body_ang_vel_w",
             ):
                 log[k] = np.stack(log[k], axis=0)
+
+            # Resample footlocks from raw NPZ if provided
+            if args_cli.raw_npz is not None:
+                output_frames = log["joint_pos"].shape[0]
+                fl_left, fl_right, fl_mask = _resample_footlocks(
+                    args_cli.raw_npz, args_cli.input_fps, args_cli.output_fps,
+                    output_frames, frame_range=args_cli.raw_npz_frame_range,
+                )
+                log["foot_contact_left"] = fl_left
+                log["foot_contact_right"] = fl_right
+                log["foot_contact_mask"] = fl_mask
+
             np.savez("/tmp/motion.npz", **log)
 
             import wandb
