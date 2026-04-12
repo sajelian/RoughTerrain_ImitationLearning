@@ -41,8 +41,12 @@ from rsl_rl.runners import OnPolicyRunner, DistillationRunner
 
 from isaaclab.envs import DirectMARLEnv, multi_agent_to_single_agent
 from isaaclab.utils.dict import print_dict
-from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper, export_policy_as_jit, export_policy_as_onnx
+import importlib.metadata as metadata
+
+from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper, handle_deprecated_rsl_rl_cfg
 from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
+
+installed_version = metadata.version("rsl-rl-lib")
 
 # Import extensions to set up environment tasks
 import RT_IL.tasks  # noqa: F401
@@ -84,8 +88,9 @@ def main():
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env)
 
-    print(f"[INFO]: Loading model checkpoint from: {resume_path}")
-    # load previously trained model
+    # strip deprecated fields from model configs for the installed rsl-rl version
+    agent_cfg = handle_deprecated_rsl_rl_cfg(agent_cfg, installed_version)
+
     # create runner from rsl-rl
     if agent_cfg.class_name == "OnPolicyRunner":
         ppo_runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
@@ -94,28 +99,17 @@ def main():
     else:
         raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
 
+    # load previously trained model
+    print(f"[INFO]: Loading model checkpoint from: {resume_path}")
+    ppo_runner.load(resume_path)
+
     # obtain the trained policy for inference
     policy = ppo_runner.get_inference_policy(device=env.unwrapped.device)
 
-    try:
-        # version 2.3 onwards
-        policy_nn = ppo_runner.alg.policy
-    except AttributeError:
-        # version 2.2 and below
-        policy_nn = ppo_runner.alg.actor_critic
-
-    # extract the normalizer
-    if hasattr(policy_nn, "actor_obs_normalizer"):
-        normalizer = policy_nn.actor_obs_normalizer
-    elif hasattr(policy_nn, "student_obs_normalizer"):
-        normalizer = policy_nn.student_obs_normalizer
-    else:
-        normalizer = None
-
-    # export policy to onnx/jit
+    # export policy to jit/onnx using runner's built-in methods (rsl_rl >= 5.0)
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
-    export_policy_as_jit(policy_nn, normalizer=normalizer, path=export_model_dir, filename="policy.pt")
-    export_policy_as_onnx(policy_nn, normalizer=normalizer, path=export_model_dir, filename="policy.onnx")
+    ppo_runner.export_policy_to_jit(export_model_dir, filename="policy.pt")
+    ppo_runner.export_policy_to_onnx(export_model_dir, filename="policy.onnx")
 
     # reset environment
     obs = env.get_observations()
