@@ -30,10 +30,9 @@ class UnitreeG1RoughDistillationRunnerCfg(RslRlDistillationRunnerCfg):
         activation="elu",
     )
     algorithm = RslRlDistillationAlgorithmCfg(
-        num_learning_epochs=4,
+        num_learning_epochs=2,
         learning_rate=1.0e-3,
         gradient_length=15,
-        max_grad_norm=1.0,
     )
 
 
