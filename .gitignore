@@ -48,3 +48,4 @@ artifacts/
 **/scripts/data_handling/data_inspect.py
 
 **/data
+pyrightconfig.json
