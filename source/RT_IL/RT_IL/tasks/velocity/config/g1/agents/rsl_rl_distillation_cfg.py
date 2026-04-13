@@ -8,8 +8,7 @@ from isaaclab.utils import configclass
 from isaaclab_rl.rsl_rl import (
     RslRlDistillationAlgorithmCfg,
     RslRlDistillationRunnerCfg,
-    RslRlDistillationStudentTeacherCfg,
-    # use this for horizon > 1? RslRlDistillationStudentTeacherRecurrentCfg
+    RslRlMLPModelCfg,
 )
 
 
@@ -19,15 +18,18 @@ class UnitreeG1RoughDistillationRunnerCfg(RslRlDistillationRunnerCfg):
     max_iterations = 500
     save_interval = 50
     experiment_name = "g1_rough"
-    obs_groups = {"policy": ["student"], "teacher": ["policy"]}
-    policy = RslRlDistillationStudentTeacherCfg(
-        init_noise_std=0.1,
-        noise_std_type="scalar",
-        student_obs_normalization=False,
-        teacher_obs_normalization=False,
-        student_hidden_dims=[512, 256, 128],
-        teacher_hidden_dims=[512, 256, 128],
+    obs_groups = {"policy": ["student"], "teacher": ["policy"], "student": ["student"]}
+    student = RslRlMLPModelCfg(
+        hidden_dims=[512, 256, 128],
         activation="elu",
+        obs_normalization=False,
+        distribution_cfg=RslRlMLPModelCfg.GaussianDistributionCfg(init_std=0.1, std_type="scalar"),
+    )
+    teacher = RslRlMLPModelCfg(
+        hidden_dims=[512, 256, 128],
+        activation="elu",
+        obs_normalization=False,
+        distribution_cfg=RslRlMLPModelCfg.GaussianDistributionCfg(init_std=0.1, std_type="scalar"),
     )
     algorithm = RslRlDistillationAlgorithmCfg(
         num_learning_epochs=2,
@@ -41,5 +43,5 @@ class UnitreeG1FlatDistillationRunnerCfg(UnitreeG1RoughDistillationRunnerCfg):
     def __post_init__(self):
         super().__post_init__()
 
-        self.policy.student_hidden_dims = [128, 128, 128]
-        self.policy.teacher_hidden_dims = [128, 128, 128]
+        self.student.hidden_dims = [128, 128, 128]
+        self.teacher.hidden_dims = [128, 128, 128]

@@ -189,7 +189,7 @@ class RewardsCfg_TRAIN(RewardsCfg):
     )
     stand_still = RewTerm(
         func=mdp.joint_pos_stand_still,
-        weight=-1.0,
+        weight=-2.0,
         params={"command_name": "base_velocity", "threshold": 0.05},
     )
 
@@ -234,6 +234,7 @@ class UnitreeG1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+        self.commands.base_velocity.rel_standing_envs = 0.15  # 15% of envs train with zero command
 
         # override events
         self.events.physics_material.params["static_friction_range"] = (0.3, 1.0)
@@ -325,3 +326,7 @@ class UnitreeG1RoughEnvCfg_DISTILLATIONPLAY(UnitreeG1RoughEnvCfg_DISTILLATION):
         # remove random pushing
         self.events.base_external_force_torque = None
         self.events.push_robot = None
+
+        #self.commands.base_velocity.ranges.lin_vel_x = (0, 0)
+        #self.commands.base_velocity.ranges.lin_vel_y = (0, 0)
+        #self.commands.base_velocity.ranges.heading = (0, 0)
