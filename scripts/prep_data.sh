@@ -5,14 +5,14 @@ set -euo pipefail
 ISAACLAB_SETUP="${HOME}/IsaacLab/_isaac_sim/setup_conda_env.sh"
 ENV_ISAACLAB="isaaclab"
 ENV_GMR="gmr_custom"
-ENV_MESH="mesh"
+ENV_MESH="isaaclab" # was mesh but they dont really differ
 
 # External GMR repo script
 GMR_REPO="${GMR_REPO:-${HOME}/GMR}"
 SMPLX_TO_G1_SH="${GMR_REPO}/scripts/smplx_to_g1_csv.sh"
 
 # Mesh conversion tool (IsaacLab)
-CONVERT_MESH_PY="${HOME}/IsaacLab/scripts/tools/convert_mesh.py"
+CONVERT_MESH_PY="IsaacLab/scripts/tools/convert_mesh.py" # depends on location of IsaacLab repo
 # --------------------------------------------
 
 usage() {
