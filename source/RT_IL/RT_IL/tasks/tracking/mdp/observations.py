@@ -4,11 +4,23 @@ import torch
 from typing import TYPE_CHECKING
 
 from isaaclab.utils.math import matrix_from_quat, subtract_frame_transforms
+from isaaclab.managers import SceneEntityCfg
 
 from RT_IL.tasks.tracking.mdp.commands import MotionCommand
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
+
+
+def noised_height_scan(env: ManagerBasedEnv, sensor_cfg: SceneEntityCfg, offset: float = 0.5) -> torch.Tensor:
+    """Height scan from a noised ray caster sensor w.r.t. the sensor's frame.
+
+    Works with any sensor exposing a `.noisy_data` property (NoisedRayCaster or
+    NoisedMultiMeshRayCaster). The offset (default 0.5 m) is subtracted so that
+    flat-ground returns are near zero.
+    """
+    sensor = env.scene.sensors[sensor_cfg.name]
+    return sensor.noisy_data.pos_w[:, 2].unsqueeze(1) - sensor.noisy_data.ray_hits_w[..., 2] - offset
 
 
 def _safe_quat(q: torch.Tensor) -> torch.Tensor:

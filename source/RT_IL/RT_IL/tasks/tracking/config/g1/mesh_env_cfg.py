@@ -1,7 +1,11 @@
+from RT_IL.mbrl.sensors import NoisedMultiMeshRayCasterCfg
+from isaaclab.sensors.ray_caster.patterns import patterns
 from isaaclab.utils import configclass
 
 from RT_IL.robots.g1 import G1_CYLINDER_CFG, G1_HYBRID_ACTION_SCALE, G1_VIZ_CFG
-from RT_IL.tasks.tracking.tracking_env_cfg import TrackingEnvCfg
+from RT_IL.tasks.tracking.tracking_env_cfg import ObservationsCfg_DISTILLATION, TrackingEnvCfg
+from isaaclab.sensors.ray_caster import RayCasterCfg, MultiMeshRayCasterCfg, patterns
+
 
 from isaaclab.assets import AssetBaseCfg
 
@@ -97,3 +101,37 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         self.terminations.ee_hand_pos = None
         self.events.push_robot = None
         # self.episode_length_s = 20.0  # some motions are longer than default 10s
+
+
+@configclass
+class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
+
+    observations: ObservationsCfg_DISTILLATION = ObservationsCfg_DISTILLATION()
+
+    def __post_init__(self):
+        # post init of parent
+        super().__post_init__()
+
+        self.scene.height_scanner = NoisedMultiMeshRayCasterCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/torso_link",
+            offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
+            ray_alignment="yaw",
+            pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
+            debug_vis=False,
+            mesh_prim_paths=[
+                "/World/ground",
+                MultiMeshRayCasterCfg.RaycastTargetCfg(
+                    prim_expr="{ENV_REGEX_NS}/obstacle",
+                    is_shared=True,
+                    track_mesh_transforms=False,
+                ),
+            ],
+        )
+
+
+@configclass
+class G1MeshEnvCfg_DISTILLATIONPLAY(G1MeshEnvCfg_DISTILLATION):
+
+    def __post_init__(self):
+        # post init of parent
+        super().__post_init__()

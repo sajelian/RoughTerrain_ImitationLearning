@@ -19,7 +19,7 @@ import isaaclab.terrains as terrain_gen
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 
 from isaaclab.sensors.ray_caster import RayCasterCfg, MultiMeshRayCasterCfg, patterns
-
+from RT_IL.mbrl.sensors import NoisedRayCasterCfg
 
 ##
 # Pre-defined configs
@@ -122,9 +122,9 @@ class MySceneCfg(InteractiveSceneCfg):
     height_scanner = MultiMeshRayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/torso_link",
         history_length=0,
-        offset=RayCasterCfg.OffsetCfg(pos=(0.4, 0.0, 20.0)),
+        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
         ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.06, size=(1.2, 0.6)),
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
         debug_vis=True,
         mesh_prim_paths=[
             "/World/ground",
@@ -169,31 +169,32 @@ class ActionsCfg:
 
 
 @configclass
-class ObservationsCfg:
+class ObservationsCfg_TRAIN:
     """Observation specifications for the MDP."""
 
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
-        # TODO check if this training setup still works without the global infos
         # observation terms (order preserved)
         command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
-        # motion_anchor_pos_b = ObsTerm(
-        #     func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.25, n_max=0.25)
-        # )
+        motion_anchor_pos_b = ObsTerm(
+            func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.25, n_max=0.25)
+        )
         motion_anchor_ori_b = ObsTerm(
             func=mdp.motion_anchor_ori_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
         )
-        # motion_body_pos_b = ObsTerm(
-        #     func=mdp.motion_body_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
-        # )
-        projected_gravity = ObsTerm(func=mdp.projected_gravity, noise=Unoise(n_min=-0.05, n_max=0.05))
-        # TODO check if it even works without base_lin_vel...
-        # base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=PROPIO_HISTORY_LEN)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2), history_length=PROPIO_HISTORY_LEN)
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01), history_length=PROPIO_HISTORY_LEN)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5), history_length=PROPIO_HISTORY_LEN)
-        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_LEN)
+        motion_body_pos_b = ObsTerm(
+            func=mdp.motion_body_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
+        )
+        projected_gravity = ObsTerm(
+            func=mdp.projected_gravity,
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
+        actions = ObsTerm(func=mdp.last_action)
 
         height_scan = ObsTerm(
             func=mdp.height_scan,
@@ -207,26 +208,25 @@ class ObservationsCfg:
             self.concatenate_terms = True
 
     @configclass
-    class PrivilegedCfg(ObsGroup):
+    class CriticCfg(ObsGroup):
+        command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
         root_pos = ObsTerm(func=mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("robot")})
         root_quat = ObsTerm(func=mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("robot")})
-        command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
         motion_anchor_pos_b = ObsTerm(func=mdp.motion_anchor_pos_b, params={"command_name": "motion"})
         motion_anchor_ori_b = ObsTerm(func=mdp.motion_anchor_ori_b, params={"command_name": "motion"})
         body_pos = ObsTerm(func=mdp.robot_body_pos_b, params={"command_name": "motion"})
         body_ori = ObsTerm(func=mdp.robot_body_ori_b, params={"command_name": "motion"})
         motion_body_pos_b = ObsTerm(func=mdp.motion_body_pos_b, params={"command_name": "motion"})
         motion_body_ori_b = ObsTerm(func=mdp.motion_body_ori_b, params={"command_name": "motion"})
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, history_length=PROPIO_HISTORY_LEN)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, history_length=PROPIO_HISTORY_LEN)
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, history_length=PROPIO_HISTORY_LEN)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, history_length=PROPIO_HISTORY_LEN)
-        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_LEN)
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        actions = ObsTerm(func=mdp.last_action)
 
         height_scan = ObsTerm(
             func=mdp.height_scan,
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-            # noise=Unoise(n_min=-0.1, n_max=0.1),
             clip=(-1.0, 1.0),
         )
 
@@ -237,7 +237,56 @@ class ObservationsCfg:
 
     # observation groups
     policy: PolicyCfg = PolicyCfg()
-    critic: PrivilegedCfg = PrivilegedCfg()
+    critic: CriticCfg = CriticCfg()
+
+
+@configclass
+class ObservationsCfg_DISTILLATION(ObservationsCfg_TRAIN):
+    """Observation specifications for the MDP."""
+
+    @configclass
+    class StudentPolicyCfg(ObsGroup):
+        """Observations for policy group."""
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
+        )
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel,
+            scale=0.2,
+            noise=Unoise(n_min=-0.25, n_max=0.25),
+            history_length=PROPIO_HISTORY_LEN,
+        )
+        projected_gravity = ObsTerm(
+            func=mdp.projected_gravity,
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+            history_length=PROPIO_HISTORY_LEN,
+        )
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+            history_length=PROPIO_HISTORY_LEN,
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=Unoise(n_min=-2.0, n_max=2.0),
+            scale=0.05,
+            history_length=PROPIO_HISTORY_LEN,
+        )
+        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_LEN)
+        height_scan = ObsTerm(
+            func=mdp.noised_height_scan,
+            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+            noise=Unoise(n_min=-0.1, n_max=0.1),
+            clip=(-1.0, 1.0),
+            history_length=1,
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+
+    # observation groups
+    student: StudentPolicyCfg = StudentPolicyCfg()
 
 
 @configclass
@@ -429,7 +478,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     # Scene settings
     scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
     # Basic settings
-    observations: ObservationsCfg = ObservationsCfg()
+    observations: ObservationsCfg_TRAIN = ObservationsCfg_TRAIN()
     actions: ActionsCfg = ActionsCfg()
     commands: CommandsCfg = CommandsCfg()
     # MDP settings
@@ -449,7 +498,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.physics_material = self.scene.terrain.physics_material
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**17
         # depends on mesh -> needs to scale with num_envs
-        self.sim.physx.gpu_collision_stack_size = 2.5 * 2**15 * self.scene.num_envs
+        self.sim.physx.gpu_collision_stack_size = 400425504 #  2.5 * 2**15 * self.scene.num_envs
         # viewer settings
         self.viewer.eye = (1.5, 1.5, 1.5)
         self.viewer.origin_type = "asset_root"
