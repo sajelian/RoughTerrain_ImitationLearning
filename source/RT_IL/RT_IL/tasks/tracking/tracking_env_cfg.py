@@ -63,7 +63,8 @@ PUSH_VELOCITY_RANGE = {
     "yaw": (-0.25, 0.25),
 }
 
-PROPIO_HISTORY_LEN = 5
+PROPIO_HISTORY_SHORT = 5
+PROPIO_HISTORY_LONG = 15
 
 
 ##
@@ -247,32 +248,33 @@ class ObservationsCfg_DISTILLATION(ObservationsCfg_TRAIN):
     @configclass
     class StudentPolicyCfg(ObsGroup):
         """Observations for policy group."""
+        command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
         motion_anchor_ori_b = ObsTerm(
-            func=mdp.motion_anchor_ori_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
+            func=mdp.motion_anchor_ori_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05), history_length=PROPIO_HISTORY_SHORT
         )
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel,
             scale=0.2,
             noise=Unoise(n_min=-0.25, n_max=0.25),
-            history_length=PROPIO_HISTORY_LEN,
+            history_length=PROPIO_HISTORY_LONG,
         )
         projected_gravity = ObsTerm(
             func=mdp.projected_gravity,
             noise=Unoise(n_min=-0.05, n_max=0.05),
-            history_length=PROPIO_HISTORY_LEN,
+            history_length=PROPIO_HISTORY_SHORT,
         )
         joint_pos = ObsTerm(
             func=mdp.joint_pos_rel,
             noise=Unoise(n_min=-0.02, n_max=0.02),
-            history_length=PROPIO_HISTORY_LEN,
+            history_length=PROPIO_HISTORY_LONG,
         )
         joint_vel = ObsTerm(
             func=mdp.joint_vel_rel,
             noise=Unoise(n_min=-2.0, n_max=2.0),
             scale=0.05,
-            history_length=PROPIO_HISTORY_LEN,
+            history_length=PROPIO_HISTORY_LONG,
         )
-        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_LEN)
+        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_SHORT)
         height_scan = ObsTerm(
             func=mdp.noised_height_scan,
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
