@@ -44,7 +44,7 @@ import os
 import pathlib
 import torch
 
-from rsl_rl.runners import OnPolicyRunner
+from rsl_rl.runners import DistillationRunner, OnPolicyRunner
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -54,9 +54,13 @@ from isaaclab.envs import (
     multi_agent_to_single_agent,
 )
 from isaaclab.utils.dict import print_dict
-from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
+import importlib.metadata as metadata
+
+from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper, handle_deprecated_rsl_rl_cfg
 from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
+
+installed_version = metadata.version("rsl-rl-lib")
 
 # Import extensions to set up environment tasks
 import RT_IL.tasks  # noqa: F401
@@ -141,8 +145,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env)
 
-    # load previously trained model
-    ppo_runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device)
+    # strip deprecated fields from model configs for the installed rsl-rl version
+    agent_cfg = handle_deprecated_rsl_rl_cfg(agent_cfg, installed_version)
+
+    # create runner from rsl-rl
+    if agent_cfg.class_name == "OnPolicyRunner":
+        ppo_runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device)
+    elif agent_cfg.class_name == "DistillationRunner":
+        ppo_runner = DistillationRunner(env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device)
+    else:
+        raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
     ppo_runner.load(resume_path)
 
     # obtain the trained policy for inference
