@@ -3,13 +3,13 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+import copy
 import os
 import torch
 
 import onnx
 
 from isaaclab.envs import ManagerBasedRLEnv
-from isaaclab_rl.rsl_rl.exporter import _OnnxPolicyExporter
 
 from RT_IL.tasks.tracking.mdp import MotionCommand
 
@@ -28,9 +28,14 @@ def export_motion_policy_as_onnx(
     policy_exporter.export(path, filename)
 
 
-class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
-    def __init__(self, env: ManagerBasedRLEnv, actor_critic, normalizer=None, verbose=False):
-        super().__init__(actor_critic, normalizer, verbose)
+class _OnnxMotionPolicyExporter(torch.nn.Module):
+    def __init__(self, env: ManagerBasedRLEnv, actor_model, normalizer=None, verbose=False):
+        torch.nn.Module.__init__(self)
+        self.verbose = verbose
+        self.is_recurrent = actor_model.is_recurrent
+        self.obs_dim = actor_model.obs_dim
+        self.actor = copy.deepcopy(actor_model.mlp)
+        self.normalizer = copy.deepcopy(normalizer) if normalizer else torch.nn.Identity()
         cmd: MotionCommand = env.command_manager.get_term("motion")
 
         self.joint_pos = cmd.motion.joint_pos.to("cpu")
@@ -55,7 +60,7 @@ class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
 
     def export(self, path, filename):
         self.to("cpu")
-        obs = torch.zeros(1, self.actor[0].in_features)
+        obs = torch.zeros(1, self.obs_dim)
         time_step = torch.zeros(1, 1)
         torch.onnx.export(
             self,
