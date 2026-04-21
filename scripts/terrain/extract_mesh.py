@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 
 # load data
-data_path = Path("data/motions/raw/full_sequence.npz")
+data_path = Path("data/motions/raw/full_sequence-001.npz")
 data = np.load(data_path, allow_pickle=True)
 
 # extract terrain mesh
@@ -21,6 +21,6 @@ terrain_mesh = trimesh.Trimesh(
     process=False
 )
 
-#terrain_mesh.invert()
-terrain_mesh.export("data/terrains/new_format/robot_hall_new.obj")
+terrain_mesh.invert()
+terrain_mesh.export("data/terrains/raw/monday.obj")
 terrain_mesh.show()
