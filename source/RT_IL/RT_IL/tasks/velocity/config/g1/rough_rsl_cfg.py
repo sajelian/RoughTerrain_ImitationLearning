@@ -33,6 +33,8 @@ import RT_IL.tasks.velocity.mdp as mdp
 from isaaclab.sensors import patterns
 from RT_IL.mbrl.sensors import NoisedRayCasterCfg
 
+PROPIO_HISTORY_SHORT = 5
+PROPIO_HISTORY_LONG = 15
 
 @configclass
 class ObservationsCfg_TRAIN(ObservationsCfg):
@@ -44,7 +46,7 @@ class ObservationsCfg_TRAIN(ObservationsCfg):
 
         # observation terms (order preserved)
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, scale=0.2)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
         projected_gravity = ObsTerm(
             func=mdp.projected_gravity,
         )
@@ -52,7 +54,7 @@ class ObservationsCfg_TRAIN(ObservationsCfg):
             func=mdp.generated_commands, params={"command_name": "base_velocity"}
         )
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, scale=0.05)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
         actions = ObsTerm(func=mdp.last_action)
         height_scan = ObsTerm(
             func=mdp.height_scan,
@@ -96,30 +98,30 @@ class ObservationsCfg_DISTILLATION(ObservationsCfg_TRAIN):
             func=mdp.base_ang_vel,
             scale=0.2,
             noise=Unoise(n_min=-0.25, n_max=0.25),
-            history_length=5,
+            history_length=PROPIO_HISTORY_LONG,
         )
         projected_gravity = ObsTerm(
             func=mdp.projected_gravity,
             noise=Unoise(n_min=-0.05, n_max=0.05),
-            history_length=5,
+            history_length=PROPIO_HISTORY_SHORT,
         )
         velocity_commands = ObsTerm(
             func=mdp.generated_commands,
             params={"command_name": "base_velocity"},
-            history_length=5,
+            history_length=PROPIO_HISTORY_SHORT,
         )
         joint_pos = ObsTerm(
             func=mdp.joint_pos_rel,
             noise=Unoise(n_min=-0.02, n_max=0.02),
-            history_length=5,
+            history_length=PROPIO_HISTORY_LONG,
         )
         joint_vel = ObsTerm(
             func=mdp.joint_vel_rel,
             noise=Unoise(n_min=-2.0, n_max=2.0),
             scale=0.05,
-            history_length=5,
+            history_length=PROPIO_HISTORY_LONG,
         )
-        actions = ObsTerm(func=mdp.last_action, history_length=5)
+        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_SHORT)
         height_scan = ObsTerm(
             func=mdp.noised_height_scan,
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
@@ -189,7 +191,7 @@ class RewardsCfg_TRAIN(RewardsCfg):
     )
     stand_still = RewTerm(
         func=mdp.joint_pos_stand_still,
-        weight=-2.0,
+        weight=-1.0,
         params={"command_name": "base_velocity", "threshold": 0.05},
     )
 
@@ -234,7 +236,7 @@ class UnitreeG1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
-        self.commands.base_velocity.rel_standing_envs = 0.15  # 15% of envs train with zero command
+        # self.commands.base_velocity.rel_standing_envs = 0.05  # 15% of envs train with zero command
 
         # override events
         self.events.physics_material.params["static_friction_range"] = (0.3, 1.0)
@@ -282,6 +284,10 @@ class UnitreeG1RoughEnvCfg_PLAY(UnitreeG1RoughEnvCfg):
         self.events.base_external_force_torque = None
         self.events.push_robot = None
 
+        #self.commands.base_velocity.ranges.lin_vel_x = (0.75, 1.0)
+        #self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
+        #self.commands.base_velocity.ranges.ang_vel_z = (0.0, 0.0)
+
 
 @configclass
 class UnitreeG1RoughEnvCfg_DISTILLATION(UnitreeG1RoughEnvCfg):
@@ -327,6 +333,6 @@ class UnitreeG1RoughEnvCfg_DISTILLATIONPLAY(UnitreeG1RoughEnvCfg_DISTILLATION):
         self.events.base_external_force_torque = None
         self.events.push_robot = None
 
-        #self.commands.base_velocity.ranges.lin_vel_x = (0, 0)
+        self.commands.base_velocity.ranges.lin_vel_x = (0.75, 1.0)
         #self.commands.base_velocity.ranges.lin_vel_y = (0, 0)
         #self.commands.base_velocity.ranges.heading = (0, 0)
