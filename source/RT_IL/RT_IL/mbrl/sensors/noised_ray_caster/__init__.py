@@ -7,3 +7,5 @@
 
 from .noised_ray_caster import NoisedRayCaster
 from .noised_ray_caster_cfg import NoisedRayCasterCfg
+from .noised_multi_mesh_ray_caster import NoisedMultiMeshRayCaster
+from .noised_multi_mesh_ray_caster_cfg import NoisedMultiMeshRayCasterCfg
