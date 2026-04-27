@@ -194,8 +194,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         # version 2.3 onwards
         policy_nn = ppo_runner.alg.policy
     except AttributeError:
-        # version 2.2 and below
-        policy_nn = ppo_runner.alg.actor_critic
+        try:
+            # version 2.2 and below
+            policy_nn = ppo_runner.alg.actor_critic
+        except AttributeError:
+            # current rsl_rl (actor/critic split, use get_policy())
+            policy_nn = ppo_runner.alg.get_policy()
 
     # extract the normalizer
     if hasattr(policy_nn, "actor_obs_normalizer"):
@@ -210,8 +214,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     export_motion_policy_as_onnx(
         env.unwrapped,
-        ppo_runner.alg.policy,
-        normalizer=ppo_runner.alg.policy.actor_obs_normalizer,
+        policy_nn,
+        normalizer=normalizer,
         path=export_model_dir,
         filename="policy.onnx",
     )

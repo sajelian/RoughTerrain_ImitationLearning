@@ -11,7 +11,6 @@ import onnx
 
 from isaaclab.envs import ManagerBasedRLEnv
 
-from RT_IL.tasks.tracking.mdp import MotionCommand
 
 
 def export_motion_policy_as_onnx(
@@ -36,49 +35,23 @@ class _OnnxMotionPolicyExporter(torch.nn.Module):
         self.obs_dim = actor_model.obs_dim
         self.actor = copy.deepcopy(actor_model.mlp)
         self.normalizer = copy.deepcopy(normalizer) if normalizer else torch.nn.Identity()
-        cmd: MotionCommand = env.command_manager.get_term("motion")
 
-        self.joint_pos = cmd.motion.joint_pos.to("cpu")
-        self.joint_vel = cmd.motion.joint_vel.to("cpu")
-        self.body_pos_w = cmd.motion.body_pos_w.to("cpu")
-        self.body_quat_w = cmd.motion.body_quat_w.to("cpu")
-        self.body_lin_vel_w = cmd.motion.body_lin_vel_w.to("cpu")
-        self.body_ang_vel_w = cmd.motion.body_ang_vel_w.to("cpu")
-        self.time_step_total = self.joint_pos.shape[0]
 
-    def forward(self, x, time_step):
-        time_step_clamped = torch.clamp(time_step.long().squeeze(-1), max=self.time_step_total - 1)
-        return (
-            self.actor(self.normalizer(x)),
-            self.joint_pos[time_step_clamped],
-            self.joint_vel[time_step_clamped],
-            self.body_pos_w[time_step_clamped],
-            self.body_quat_w[time_step_clamped],
-            self.body_lin_vel_w[time_step_clamped],
-            self.body_ang_vel_w[time_step_clamped],
-        )
+    def forward(self, x):
+        return self.actor(self.normalizer(x))
 
     def export(self, path, filename):
         self.to("cpu")
         obs = torch.zeros(1, self.obs_dim)
-        time_step = torch.zeros(1, 1)
         torch.onnx.export(
             self,
-            (obs, time_step),
+            obs,
             os.path.join(path, filename),
             export_params=True,
             opset_version=11,
             verbose=self.verbose,
-            input_names=["obs", "time_step"],
-            output_names=[
-                "actions",
-                "joint_pos",
-                "joint_vel",
-                "body_pos_w",
-                "body_quat_w",
-                "body_lin_vel_w",
-                "body_ang_vel_w",
-            ],
+            input_names=["obs"],
+            output_names=["actions"],
             dynamic_axes={},
         )
 
