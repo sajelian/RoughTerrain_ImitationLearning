@@ -179,7 +179,7 @@ class ObservationsCfg_TRAIN:
         # observation terms (order preserved)
         command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
         motion_anchor_pos_b = ObsTerm(
-            func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.25, n_max=0.25)
+            func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
         )
         motion_anchor_ori_b = ObsTerm(
             func=mdp.motion_anchor_ori_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.05, n_max=0.05)
@@ -192,9 +192,9 @@ class ObservationsCfg_TRAIN:
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.1, n_max=0.1))
         actions = ObsTerm(func=mdp.last_action)
 
         height_scan = ObsTerm(
@@ -255,7 +255,7 @@ class ObservationsCfg_DISTILLATION(ObservationsCfg_TRAIN):
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel,
             scale=0.2,
-            noise=Unoise(n_min=-0.25, n_max=0.25),
+            noise=Unoise(n_min=-0.2, n_max=0.2),
             history_length=PROPIO_HISTORY_LONG,
         )
         projected_gravity = ObsTerm(
@@ -265,12 +265,12 @@ class ObservationsCfg_DISTILLATION(ObservationsCfg_TRAIN):
         )
         joint_pos = ObsTerm(
             func=mdp.joint_pos_rel,
-            noise=Unoise(n_min=-0.02, n_max=0.02),
+            noise=Unoise(n_min=-0.01, n_max=0.01),
             history_length=PROPIO_HISTORY_LONG,
         )
         joint_vel = ObsTerm(
             func=mdp.joint_vel_rel,
-            noise=Unoise(n_min=-2.0, n_max=2.0),
+            noise=Unoise(n_min=-0.5, n_max=0.5),
             scale=0.05,
             history_length=PROPIO_HISTORY_LONG,
         )
@@ -439,7 +439,7 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     anchor_pos = DoneTerm(
         func=mdp.bad_anchor_pos,
-        params={"command_name": "motion", "threshold_xy": 0.75, "threshold_z": 0.3},  # full 3D norm: catches xy drift under absolute tracking
+        params={"command_name": "motion", "threshold_xy": 0.5, "threshold_z": 0.2},  # full 3D norm: catches xy drift under absolute tracking
     )
     anchor_ori = DoneTerm(
         func=mdp.bad_anchor_ori,
@@ -449,8 +449,8 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_xy_z,
         params={
             "command_name": "motion",
-            "threshold_xy": 0.35,
-            "threshold_z": 0.35,
+            "threshold_xy": 0.25,
+            "threshold_z": 0.25,
             "body_names": ["left_ankle_roll_link", "right_ankle_roll_link"],
         },
     )

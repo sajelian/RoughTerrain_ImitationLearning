@@ -1,3 +1,5 @@
+import torch
+
 from RT_IL.mbrl.sensors import NoisedMultiMeshRayCasterCfg
 from isaaclab.sensors.ray_caster.patterns import patterns
 from isaaclab.utils import configclass
@@ -20,7 +22,23 @@ class FixedStartMotionCommand(MotionCommand):
     def _adaptive_sampling(self, env_ids):
         if len(env_ids) == 0:
             return
-        self.time_steps[env_ids] = 0
+        self.time_steps[env_ids] = 20
+
+
+class BiasedStartMotionCommand(MotionCommand):
+    """Motion command variant with fixed biased sampling: 50% of clips start in the first
+    25% of frames, 50% start in the remaining 75%."""
+
+    def _adaptive_sampling(self, env_ids):
+        if len(env_ids) == 0:
+            return
+        n = len(env_ids)
+        total = max(self.motion.time_step_total - 1, 1)
+        n_early = (n + 1) // 2  # ceil(n/2) go to first 25%
+        n_late = n - n_early
+        early = (torch.rand(n_early, device=self.device) * 0.25 * total).long()
+        late = (0.25 * total + torch.rand(n_late, device=self.device) * 0.75 * total).long()
+        self.time_steps[env_ids] = torch.cat([early, late]).clamp(0, total)
 
 
 @configclass
@@ -95,12 +113,12 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         # always start from beginning of motion
         self.commands.motion.class_type = FixedStartMotionCommand
         # reduce termination thresholds to show failures more clearly
-        # self.terminations.anchor_pos = None
-        self.terminations.anchor_ori = None
-        self.terminations.ee_feet_pos = None
-        self.terminations.ee_hand_pos = None
+        #self.terminations.anchor_pos = None
+        #self.terminations.anchor_ori = None
+        #self.terminations.ee_feet_pos = None
+        #self.terminations.ee_hand_pos = None
         self.events.push_robot = None
-        # self.episode_length_s = 20.0  # some motions are longer than default 10s
+        self.episode_length_s = 7.0  # some motions are longer than default 10s
 
 
 @configclass
@@ -111,6 +129,7 @@ class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
+        self.commands.motion.class_type = BiasedStartMotionCommand
 
         self.scene.height_scanner = NoisedMultiMeshRayCasterCfg(
             prim_path="{ENV_REGEX_NS}/Robot/torso_link",
@@ -135,3 +154,22 @@ class G1MeshEnvCfg_DISTILLATIONPLAY(G1MeshEnvCfg_DISTILLATION):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
+
+        self.commands.motion.debug_vis = False
+        self.scene.viz_robot = None # G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
+
+        # Viewer options for filming whole motions externally
+        #self.viewer.eye = (0.9, 0.5, 2.4)
+        #self.viewer.lookat = (0.0, -4.7, 0.0)
+        #self.viewer.origin_type = "asset_root"
+        self.viewer.eye = (2.5, 2.5, 2.5)
+        self.viewer.resolution = (1920, 1080)
+        # always start from beginning of motion
+        self.commands.motion.class_type = FixedStartMotionCommand
+        # reduce termination thresholds to show failures more clearly
+        #self.terminations.anchor_pos = None
+        #self.terminations.anchor_ori = None
+        #self.terminations.ee_feet_pos = None
+        self.terminations.ee_hand_pos = None
+        self.events.push_robot = None
+        self.episode_length_s = 7.0  # some motions are longer than default 10s
