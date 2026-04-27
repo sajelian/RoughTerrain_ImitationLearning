@@ -65,7 +65,12 @@ installed_version = metadata.version("rsl-rl-lib")
 
 # Import extensions to set up environment tasks
 import RT_IL.tasks  # noqa: F401
-from RT_IL.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
+from RT_IL.utils.exporter import (
+    attach_onnx_metadata,
+    export_motion_policy_as_onnx,
+    infer_export_observation_group,
+    select_export_normalizer,
+)
 
 
 @hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
@@ -164,25 +169,26 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         # version 2.2 and below
         policy_nn = ppo_runner.alg.actor_critic
 
-    # extract the normalizer
-    if hasattr(policy_nn, "actor_obs_normalizer"):
-        normalizer = policy_nn.actor_obs_normalizer
-    elif hasattr(policy_nn, "student_obs_normalizer"):
-        normalizer = policy_nn.student_obs_normalizer
-    else:
-        normalizer = None
+    obs_group = infer_export_observation_group(env.unwrapped)
+    normalizer = select_export_normalizer(policy_nn, obs_group)
 
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
 
     export_motion_policy_as_onnx(
         env.unwrapped,
-        ppo_runner.alg.policy,
-        normalizer=ppo_runner.alg.policy.actor_obs_normalizer,
+        policy_nn,
+        normalizer=normalizer,
         path=export_model_dir,
         filename="policy.onnx",
+        prefer_student=(obs_group == "student"),
     )
-    attach_onnx_metadata(env.unwrapped, args_cli.wandb_path if args_cli.wandb_path else "none", export_model_dir)
+    attach_onnx_metadata(
+        env.unwrapped,
+        args_cli.wandb_path if args_cli.wandb_path else "none",
+        export_model_dir,
+        obs_group=obs_group,
+    )
     # reset environment
     obs = env.get_observations()
     timestep = 0

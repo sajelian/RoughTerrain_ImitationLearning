@@ -6,7 +6,12 @@ from rsl_rl.runners import DistillationRunner, OnPolicyRunner
 from isaaclab_rl.rsl_rl import export_policy_as_onnx
 
 import wandb
-from RT_IL.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
+from RT_IL.utils.exporter import (
+    attach_onnx_metadata,
+    export_motion_policy_as_onnx,
+    infer_export_observation_group,
+    select_export_normalizer,
+)
 
 
 class MyOnPolicyRunner(OnPolicyRunner):
@@ -36,11 +41,23 @@ class MotionOnPolicyRunner(OnPolicyRunner):
             policy_path = path.split("model")[0]
             filename = policy_path.split("/")[-2] + ".onnx"
             policy_nn = self.alg.get_policy()
-            normalizer = getattr(policy_nn, "obs_normalizer", None)
+            obs_group = infer_export_observation_group(self.env.unwrapped)
+            normalizer = select_export_normalizer(policy_nn, obs_group)
             export_motion_policy_as_onnx(
-                self.env.unwrapped, policy_nn, normalizer=normalizer, path=policy_path, filename=filename
+                self.env.unwrapped,
+                policy_nn,
+                normalizer=normalizer,
+                path=policy_path,
+                filename=filename,
+                prefer_student=(obs_group == "student"),
             )
-            attach_onnx_metadata(self.env.unwrapped, wandb.run.name, path=policy_path, filename=filename)
+            attach_onnx_metadata(
+                self.env.unwrapped,
+                wandb.run.name,
+                path=policy_path,
+                filename=filename,
+                obs_group=obs_group,
+            )
             wandb.save(policy_path + filename, base_path=os.path.dirname(policy_path))
 
             # link the artifact registry to this run
@@ -63,11 +80,23 @@ class MotionDistillationRunner(DistillationRunner):
             policy_path = path.split("model")[0]
             filename = policy_path.split("/")[-2] + ".onnx"
             policy_nn = self.alg.get_policy()
-            normalizer = getattr(policy_nn, "obs_normalizer", None)
+            obs_group = infer_export_observation_group(self.env.unwrapped)
+            normalizer = select_export_normalizer(policy_nn, obs_group)
             export_motion_policy_as_onnx(
-                self.env.unwrapped, policy_nn, normalizer=normalizer, path=policy_path, filename=filename
+                self.env.unwrapped,
+                policy_nn,
+                normalizer=normalizer,
+                path=policy_path,
+                filename=filename,
+                prefer_student=(obs_group == "student"),
             )
-            attach_onnx_metadata(self.env.unwrapped, wandb.run.name, path=policy_path, filename=filename)
+            attach_onnx_metadata(
+                self.env.unwrapped,
+                wandb.run.name,
+                path=policy_path,
+                filename=filename,
+                obs_group=obs_group,
+            )
             wandb.save(policy_path + filename, base_path=os.path.dirname(policy_path))
 
             if self.registry_name is not None:

@@ -87,6 +87,7 @@ from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
 
 # Import extensions to set up environment tasks
 import RT_IL.tasks  # noqa: F401
+from RT_IL.utils.exporter import infer_export_observation_group, select_export_normalizer
 
 
 def main():
@@ -162,13 +163,8 @@ def main():
         # version 2.2 and below
         policy_nn = ppo_runner.alg.actor_critic
 
-    # extract the normalizer
-    if hasattr(policy_nn, "actor_obs_normalizer"):
-        normalizer = policy_nn.actor_obs_normalizer
-    elif hasattr(policy_nn, "student_obs_normalizer"):
-        normalizer = policy_nn.student_obs_normalizer
-    else:
-        normalizer = None
+    obs_group = infer_export_observation_group(env.unwrapped)
+    normalizer = select_export_normalizer(policy_nn, obs_group)
 
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
