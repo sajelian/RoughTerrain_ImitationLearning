@@ -152,13 +152,14 @@ class CommandsCfg:
         pose_range={
             "x": (-0.05, 0.05),
             "y": (-0.05, 0.05),
-            "z": (-0.01, 0.01),
+            "z": (-0.00, 0.01),
             "roll": (-0.1, 0.1),
             "pitch": (-0.1, 0.1),
             "yaw": (-0.2, 0.2),
         },
         velocity_range=VELOCITY_RANGE,
         joint_position_range=(-0.1, 0.1),
+        start_xy_noise_std=0.10,
     )
 
 

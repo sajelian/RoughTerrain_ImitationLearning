@@ -60,9 +60,9 @@ class G1MeshPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         value_loss_coef=1.0,
         use_clipped_value_loss=True,
         clip_param=0.2,
-        entropy_coef=0.005,  # TODO not sure about this
+        entropy_coef=0.005,
         num_learning_epochs=5,
-        num_mini_batches=8,  # TODO not sure about this
+        num_mini_batches=4,  # TODO not sure about this
         learning_rate=1.0e-3,
         schedule="adaptive",
         gamma=0.99,

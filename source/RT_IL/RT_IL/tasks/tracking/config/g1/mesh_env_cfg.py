@@ -22,7 +22,7 @@ class FixedStartMotionCommand(MotionCommand):
     def _adaptive_sampling(self, env_ids):
         if len(env_ids) == 0:
             return
-        self.time_steps[env_ids] = 20
+        self.time_steps[env_ids] = 10
 
 
 class BiasedStartMotionCommand(MotionCommand):
@@ -112,6 +112,7 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         self.viewer.resolution = (1920, 1080)
         # always start from beginning of motion
         self.commands.motion.class_type = FixedStartMotionCommand
+        self.commands.motion.start_xy_noise_std = 0.0
         # reduce termination thresholds to show failures more clearly
         #self.terminations.anchor_pos = None
         #self.terminations.anchor_ori = None
@@ -136,7 +137,7 @@ class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
             offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
             ray_alignment="yaw",
             pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
-            debug_vis=False,
+            debug_vis=True,
             mesh_prim_paths=[
                 "/World/ground",
                 MultiMeshRayCasterCfg.RaycastTargetCfg(
@@ -166,10 +167,11 @@ class G1MeshEnvCfg_DISTILLATIONPLAY(G1MeshEnvCfg_DISTILLATION):
         self.viewer.resolution = (1920, 1080)
         # always start from beginning of motion
         self.commands.motion.class_type = FixedStartMotionCommand
+        self.commands.motion.start_xy_noise_std = 0.0
         # reduce termination thresholds to show failures more clearly
-        #self.terminations.anchor_pos = None
-        #self.terminations.anchor_ori = None
-        #self.terminations.ee_feet_pos = None
+        self.terminations.anchor_pos = None
+        self.terminations.anchor_ori = None
+        self.terminations.ee_feet_pos = None
         self.terminations.ee_hand_pos = None
         self.events.push_robot = None
         self.episode_length_s = 7.0  # some motions are longer than default 10s

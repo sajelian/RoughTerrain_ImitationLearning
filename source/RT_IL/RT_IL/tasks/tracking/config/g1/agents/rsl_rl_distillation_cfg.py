@@ -14,7 +14,7 @@ from isaaclab_rl.rsl_rl import (
 
 @configclass
 class G1MimicMeshDistillationRunnerCfg(RslRlDistillationRunnerCfg):
-    num_steps_per_env = 120
+    num_steps_per_env = 48
     max_iterations = 3000
     save_interval = 50
     experiment_name = "g1_mimic_mesh"
@@ -34,9 +34,9 @@ class G1MimicMeshDistillationRunnerCfg(RslRlDistillationRunnerCfg):
     )
     algorithm = RslRlDistillationAlgorithmCfg(
         num_learning_epochs=2,
-        learning_rate=1.0e-3,
+        learning_rate=5.0e-4,
         gradient_length=15,
-        # max_grad_norm=1.0,
+        max_grad_norm=1.0,
     )
 
 

@@ -345,6 +345,11 @@ class MotionCommand(CommandTerm):
         ranges = torch.tensor(range_list, device=self.device)
         rand_samples = sample_uniform(ranges[:, 0], ranges[:, 1], (len(env_ids), 6), device=self.device)
         root_pos[env_ids] += rand_samples[:, 0:3]
+        if self.cfg.start_xy_noise_std > 0.0:
+            early_mask = self.time_steps[env_ids] < int(0.1 * self.motion.time_step_total)
+            if early_mask.any():
+                xy_noise = torch.randn(int(early_mask.sum()), 2, device=self.device) * self.cfg.start_xy_noise_std
+                root_pos[env_ids[early_mask], :2] += xy_noise
         orientations_delta = quat_from_euler_xyz(rand_samples[:, 3], rand_samples[:, 4], rand_samples[:, 5])
         root_ori[env_ids] = quat_mul(orientations_delta, root_ori[env_ids])
         range_list = [self.cfg.velocity_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
@@ -461,6 +466,8 @@ class MotionCommandCfg(CommandTermCfg):
     adaptive_lambda: float = 0.8
     adaptive_uniform_ratio: float = 0.1
     adaptive_alpha: float = 0.001
+
+    start_xy_noise_std: float = 0.0
 
     anchor_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/pose")
     anchor_visualizer_cfg.markers["frame"].scale = (0.2, 0.2, 0.2)
