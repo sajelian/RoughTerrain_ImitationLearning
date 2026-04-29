@@ -114,10 +114,10 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         self.commands.motion.class_type = FixedStartMotionCommand
         self.commands.motion.start_xy_noise_std = 0.0
         # reduce termination thresholds to show failures more clearly
-        #self.terminations.anchor_pos = None
-        #self.terminations.anchor_ori = None
-        #self.terminations.ee_feet_pos = None
-        #self.terminations.ee_hand_pos = None
+        self.terminations.anchor_pos = None
+        self.terminations.anchor_ori = None
+        self.terminations.ee_feet_pos = None
+        self.terminations.ee_hand_pos = None
         self.events.push_robot = None
         self.episode_length_s = 7.0  # some motions are longer than default 10s
 
