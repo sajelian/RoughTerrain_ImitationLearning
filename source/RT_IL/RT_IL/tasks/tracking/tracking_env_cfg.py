@@ -341,6 +341,21 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
+    # TODO tune this to match the actual forces observed in the reference
+    foot_contact_schedule = RewTerm(
+        func=mdp.foot_contact_schedule_sparse,
+        weight=4.0,
+        params={
+            "command_name": "motion",
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces",
+                body_names=["left_ankle_roll_link", "right_ankle_roll_link"],
+            ),
+            "std_normalized": 0.25,
+            "robot_mass": 35.0,
+        },
+    )
+
     motion_global_feet_body_pos = RewTerm(
         func=mdp.motion_global_body_position_error_exp,
         weight=4.0,
@@ -396,20 +411,6 @@ class RewardsCfg:
         func=mdp.motion_global_body_angular_velocity_error_exp,
         weight=1.0,
         params={"command_name": "motion", "std": 3.14},
-    )
-    # TODO tune this to match the actual forces observed in the reference
-    foot_contact_schedule = RewTerm(
-        func=mdp.foot_contact_schedule_sparse,
-        weight=4.0,
-        params={
-            "command_name": "motion",
-            "sensor_cfg": SceneEntityCfg(
-                "contact_forces",
-                body_names=["left_ankle_roll_link", "right_ankle_roll_link"],
-            ),
-            "std_normalized": 0.25,
-            "robot_mass": 35.0,
-        },
     )
     # TODO check if this helps remove the shaky behavior
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-3e-1)
