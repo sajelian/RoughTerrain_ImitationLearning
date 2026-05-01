@@ -407,7 +407,7 @@ class RewardsCfg:
                 "contact_forces",
                 body_names=["left_ankle_roll_link", "right_ankle_roll_link"],
             ),
-            "std_normalized": 0.5,
+            "std_normalized": 0.25,
             "robot_mass": 35.0,
         },
     )

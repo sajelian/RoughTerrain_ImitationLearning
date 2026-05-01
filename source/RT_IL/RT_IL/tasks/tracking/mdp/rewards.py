@@ -213,19 +213,20 @@ def foot_contact_schedule_sparse(
     ref_left, ref_right, valid_mask = schedule
 
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
-    force_mag = (
-        contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :]
-        .norm(dim=-1)
-        .max(dim=1)[0]
-    )
+    force_history = contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :].norm(dim=-1)
+    # max over history confirms a foot landed (peak force); min confirms it's truly airborne
+    force_mag_max = force_history.max(dim=1)[0]
+    force_mag_min = force_history.min(dim=1)[0]
 
     GRAVITY = 9.81
     body_weight_force = robot_mass * GRAVITY
-    force_normalized = force_mag / body_weight_force
+    force_norm_max = force_mag_max / body_weight_force
+    force_norm_min = force_mag_min / body_weight_force
 
-    exp_term = torch.exp(-force_normalized.square() / (std_normalized**2))
-    contact_reward = 1.0 - exp_term
-    no_contact_reward = exp_term
+    # contact_reward uses max: a single peak is enough to confirm ground contact
+    # no_contact_reward uses min: foot must be light throughout the window to earn air reward
+    contact_reward = 1.0 - torch.exp(-force_norm_max.square() / (std_normalized**2))
+    no_contact_reward = torch.exp(-force_norm_min.square() / (std_normalized**2))
 
     ref = torch.stack([ref_left, ref_right], dim=-1).float()
     correct_reward = ref * contact_reward + (1 - ref) * no_contact_reward
