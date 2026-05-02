@@ -101,9 +101,7 @@ class G1MimicMeshWoStateEstimationEnvCfg(G1MeshEnvCfg):
 class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
     def __post_init__(self):
         super().__post_init__()
-        self.commands.motion.debug_vis = False
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
-
         # Viewer options for filming whole motions externally
         #self.viewer.eye = (0.9, 0.5, 2.4)
         #self.viewer.lookat = (0.0, -4.7, 0.0)
@@ -112,14 +110,14 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         self.viewer.resolution = (1920, 1080)
         # always start from beginning of motion
         self.commands.motion.class_type = FixedStartMotionCommand
-        self.commands.motion.start_xy_noise_std = 0.0
         # reduce termination thresholds to show failures more clearly
         self.terminations.anchor_pos = None
-        self.terminations.anchor_ori = None
+        # self.terminations.anchor_ori = None
         self.terminations.ee_feet_pos = None
         self.terminations.ee_hand_pos = None
         self.events.push_robot = None
-        self.episode_length_s = 7.0  # some motions are longer than default 10s
+        # self.commands.motion.start_xy_noise_std = 0.0
+        # self.episode_length_s = 7.0  # some motions are longer than default 10s
 
 
 @configclass
@@ -147,6 +145,11 @@ class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
                 ),
             ],
         )
+
+
+        # TODO: consider relaxing termination thresholds for student training
+        self.terminations.anchor_pos.params["threshold_xy"] = 1.0
+        self.terminations.anchor_pos.params["threshold_z"] = 0.4
 
 
 @configclass
