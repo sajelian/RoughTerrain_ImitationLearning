@@ -160,7 +160,7 @@ class G1MeshEnvCfg_DISTILLATIONPLAY(G1MeshEnvCfg_DISTILLATION):
         super().__post_init__()
 
         self.commands.motion.debug_vis = False
-        self.scene.viz_robot = None # G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
+        self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
 
         # Viewer options for filming whole motions externally
         #self.viewer.eye = (0.9, 0.5, 2.4)

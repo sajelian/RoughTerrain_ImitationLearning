@@ -348,7 +348,7 @@ class MotionCommand(CommandTerm):
         if self.cfg.start_xy_noise_std > 0.0:
             early_mask = self.time_steps[env_ids] < int(0.1 * self.motion.time_step_total)
             if early_mask.any():
-                xy_noise = torch.randn(int(early_mask.sum()), 2, device=self.device) * self.cfg.start_xy_noise_std
+                xy_noise = (torch.rand(int(early_mask.sum()), 2, device=self.device) * 2 - 1) * self.cfg.start_xy_noise_std
                 root_pos[env_ids[early_mask], :2] += xy_noise
         orientations_delta = quat_from_euler_xyz(rand_samples[:, 3], rand_samples[:, 4], rand_samples[:, 5])
         root_ori[env_ids] = quat_mul(orientations_delta, root_ori[env_ids])
