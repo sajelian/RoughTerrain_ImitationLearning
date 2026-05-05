@@ -75,7 +75,7 @@ RESET_VELOCITY_RANGE = {
 
 
 PROPIO_HISTORY_SHORT = 5
-PROPIO_HISTORY_LONG = 15
+PROPIO_HISTORY_LONG = 5
 
 
 ##
@@ -137,7 +137,7 @@ class MySceneCfg(InteractiveSceneCfg):
     height_scanner = MultiMeshRayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/torso_link",
         history_length=0,
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
+        offset=RayCasterCfg.OffsetCfg(pos=(0.4, 0.0, 20.0)),
         ray_alignment="yaw",
         pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
         debug_vis=False,
@@ -169,11 +169,11 @@ class CommandsCfg:
             "z": (-0.00, 0.01),
             "roll": (-0.1, 0.1),
             "pitch": (-0.1, 0.1),
-            "yaw": (-0.2, 0.2),
+            "yaw": (-0.3, 0.3), #TODO might make this bigger
         },
         velocity_range=RESET_VELOCITY_RANGE,
         joint_position_range=(-0.1, 0.1),
-        start_xy_noise_std=0.01,  # keep this < 0.3 or episode will terminate immediately
+        start_xy_noise_std=0.25,  # keep this < 0.3 or episode will terminate immediately
     )
 
 
@@ -198,18 +198,8 @@ class ObservationsCfg_TRAIN:
         command = ObsTerm(
             func=mdp.generated_commands, params={"command_name": "motion"}
         )
-        motion_anchor_pos_b = ObsTerm(
-            func=mdp.motion_anchor_pos_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.05, n_max=0.05),
-        )
         motion_anchor_ori_b = ObsTerm(
             func=mdp.motion_anchor_ori_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.05, n_max=0.05),
-        )
-        motion_body_pos_b = ObsTerm(
-            func=mdp.motion_body_pos_b,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
@@ -232,7 +222,7 @@ class ObservationsCfg_TRAIN:
         height_scan = ObsTerm(
             func=mdp.height_scan,
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-            noise=Unoise(n_min=-0.1, n_max=0.1),
+            noise=Unoise(n_min=-0.02, n_max=0.02),
             clip=(-1.0, 1.0),
         )
 
@@ -336,8 +326,7 @@ class ObservationsCfg_DISTILLATION(ObservationsCfg_TRAIN):
             func=mdp.noised_height_scan,
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
             noise=Unoise(n_min=-0.1, n_max=0.1),
-            clip=(-1.0, 1.0),
-            history_length=1,
+            clip=(-1.0, 1.0)
         )
 
         def __post_init__(self):
@@ -413,7 +402,7 @@ class RewardsCfg:
 
     motion_global_feet_body_pos = RewTerm(
         func=mdp.motion_global_body_position_error_exp,
-        weight=2.0,
+        weight=1.0,
         params={
             "command_name": "motion",
             "std": 0.3,
@@ -439,7 +428,7 @@ class RewardsCfg:
 
     motion_global_anchor_pos = RewTerm(
         func=mdp.motion_global_anchor_position_error_exp,
-        weight=1.5,
+        weight=2.0,
         params={"command_name": "motion", "std": 0.3},
     )
     motion_global_anchor_ori = RewTerm(
@@ -449,7 +438,7 @@ class RewardsCfg:
     )
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_error_exp,
-        weight=1.0,
+        weight=0.5,
         params={"command_name": "motion", "std": 0.3},
     )
     motion_body_ori = RewTerm(
@@ -519,8 +508,8 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_xy_z,
         params={
             "command_name": "motion",
-            "threshold_xy": 0.35,
-            "threshold_z": 0.35,
+            "threshold_xy": 0.45,
+            "threshold_z": 0.45,
             "body_names": ["left_ankle_roll_link", "right_ankle_roll_link"],
         },
     )

@@ -40,19 +40,21 @@ class G1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 @configclass
 class G1MeshPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
-    max_iterations = 50000
+    max_iterations = 30000
     save_interval = 500
     experiment_name = "g1_mimic_mesh"
     clip_actions = 100.0
     obs_groups = {"actor": ["policy"], "critic": ["critic"]}
     actor = RslRlMLPModelCfg(
-        hidden_dims=[1024, 512, 256, 128],
+        #hidden_dims=[1024, 512, 256, 128],
+        hidden_dims=[512, 256, 128],
         activation="elu",
         obs_normalization=True,
         distribution_cfg=RslRlMLPModelCfg.GaussianDistributionCfg(init_std=1.0),
     )
     critic = RslRlMLPModelCfg(
-        hidden_dims=[1024, 512, 256, 128],
+        #hidden_dims=[1024, 512, 256, 128],
+        hidden_dims=[512, 256, 128],
         activation="elu",
         obs_normalization=True,
     )
@@ -62,7 +64,7 @@ class G1MeshPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         clip_param=0.2,
         entropy_coef=0.005,
         num_learning_epochs=5,
-        num_mini_batches=4,  # TODO not sure about this
+        num_mini_batches=8,  # TODO not sure about this
         learning_rate=1.0e-3,
         schedule="adaptive",
         gamma=0.99,
