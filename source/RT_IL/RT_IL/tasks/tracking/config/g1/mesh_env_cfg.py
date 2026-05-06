@@ -128,7 +128,7 @@ class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
-        self.commands.motion.class_type = BiasedStartMotionCommand
+        # self.commands.motion.class_type = BiasedStartMotionCommand
 
         self.scene.height_scanner = NoisedMultiMeshRayCasterCfg(
             prim_path="{ENV_REGEX_NS}/Robot/torso_link",
