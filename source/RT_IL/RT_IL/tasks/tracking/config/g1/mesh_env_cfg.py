@@ -132,7 +132,7 @@ class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
 
         self.scene.height_scanner = NoisedMultiMeshRayCasterCfg(
             prim_path="{ENV_REGEX_NS}/Robot/torso_link",
-            offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
+            offset=RayCasterCfg.OffsetCfg(pos=(0.4, 0.0, 20.0)),
             ray_alignment="yaw",
             pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
             debug_vis=True,
