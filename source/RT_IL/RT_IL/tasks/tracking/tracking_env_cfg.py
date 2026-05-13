@@ -482,6 +482,8 @@ class EventCfg:
         params={"velocity_range": PUSH_VELOCITY_RANGE},
     )
 
+    foot_perturbation: EventTerm | None = None
+
 
 @configclass
 class RewardsCfg:
