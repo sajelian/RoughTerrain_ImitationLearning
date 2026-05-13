@@ -89,10 +89,11 @@ reportPrivateUsage = "warning"
 # VS Code's python.analysis.extraPaths is ignored when [tool.pyright] exists,
 # so keep them here instead.
 extraPaths = [
-    "/local/home/hsajelian/IsaacLab/source",
-    "/local/home/hsajelian/IsaacLab/source/isaaclab",
-    "/local/home/hsajelian/IsaacLab/source/isaaclab_tasks",
-    "/local/home/hsajelian/IsaacLab/source/isaaclab_assets",
-    "/local/home/hsajelian/IsaacLab/source/isaaclab_rl",
-    "/local/home/hsajelian/RT_IL/source/RT_IL",
+    "IsaacLab/source/isaaclab",
+    "IsaacLab/source/isaaclab_assets",
+    "IsaacLab/source/isaaclab_rl",
+    "IsaacLab/source/isaaclab_tasks",
+    "IsaacLab/source/isaaclab_mimic",
+    "source/RT_IL",
+    "scripts/rsl_rl",
 ]
