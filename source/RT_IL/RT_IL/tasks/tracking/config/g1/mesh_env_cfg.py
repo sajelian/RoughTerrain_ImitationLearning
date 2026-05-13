@@ -8,7 +8,7 @@ from isaaclab.managers import EventTermCfg as EventTerm
 
 from RT_IL.robots.g1 import G1_CYLINDER_CFG, G1_HYBRID_ACTION_SCALE, G1_VIZ_CFG
 from RT_IL.tasks.tracking.tracking_env_cfg import ObservationsCfg_DISTILLATION, ObservationsCfg_DEPLOY, TrackingEnvCfg
-from isaaclab.sensors.ray_caster import RayCasterCfg, MultiMeshRayCasterCfg, patterns
+from isaaclab.sensors.ray_caster import RayCasterCfg, MultiMeshRayCasterCfg
 
 
 from isaaclab.assets import AssetBaseCfg
