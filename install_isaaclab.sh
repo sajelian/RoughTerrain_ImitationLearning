@@ -181,6 +181,20 @@ log "Installing Isaac Lab extensions (target: ${ISAACLAB_INSTALL_TARGET})"
 # when uv is available.
 ./isaaclab.sh --install "${ISAACLAB_INSTALL_TARGET}"
 
+
+# ==============================================================================
+# ── STEP 7: Install your project (RT_IL) ─────────────────────────────────────
+# ==============================================================================
+ 
+log "Installing RT_IL project"
+ 
+# Install your own project as an editable package (-e) from within the IsaacLab
+# source tree. Editable mode means Python imports your actual source files
+# directly — no reinstall needed when you change your code during experiments.
+# We use "python -m pip" (rather than bare "pip") to guarantee we're using the
+# pip that belongs to the currently active virtual environment.
+python -m pip install -e source/RT_IL
+
 # ==============================================================================
 # ── DONE ──────────────────────────────────────────────────────────────────────
 # ==============================================================================
