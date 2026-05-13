@@ -12,7 +12,7 @@
 #   (Python, Isaac Sim, PyTorch, Isaac Lab git commit), any team member or
 #   CI machine can reproduce an identical environment months later.
 #
-# Tested on: Ubuntu 22.04 LTS (GLIBC 2.35+), x86_64, CUDA 12.8
+# Tested on: Ubuntu 22.04 LTS (GLIBC 2.35+), x86_64, CUDA 13.0
 # ==============================================================================
 
 set -euo pipefail  # -e: exit on error, -u: error on unset var, -o pipefail: catch pipe errors
@@ -33,17 +33,17 @@ ISAAC_SIM_VERSION="5.1.0"
 ISAAC_LAB_REPO="https://github.com/isaac-sim/IsaacLab.git"
 ISAAC_LAB_COMMIT="3e73d6dd79080fd7632488c061052a6edd52e230t"  # main as of 2025-05-14
 
-# PyTorch — must match your CUDA version. cu128 = CUDA 12.8
+# PyTorch — must match your CUDA version. cu130 = CUDA 13.0
 TORCH_VERSION="2.7.0"
 TORCHVISION_VERSION="0.22.0"
-TORCH_INDEX_URL="https://download.pytorch.org/whl/cu128"
+TORCH_INDEX_URL="https://download.pytorch.org/whl/cu130"
 
 # Name of the virtual environment directory
 ENV_NAME="env_isaaclab"
 
 # Which Isaac Lab learning frameworks to install.
 # Options: all | rl_games | rsl_rl | sb3 | skrl | robomimic | none
-ISAACLAB_INSTALL_TARGET="all"
+ISAACLAB_INSTALL_TARGET="rsl_rl"
 
 # ==============================================================================
 # ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -99,13 +99,8 @@ echo "GLIBC $GLIBC_VERSION ✓"
 
 log "Creating uv virtual environment: ${ENV_NAME} (Python ${PYTHON_VERSION})"
 
-# --python pins the exact interpreter version
-# --seed bootstraps pip into the env — Isaac Lab's install scripts require pip
-# even though we use "uv pip" for all our own installs
 uv venv --python "${PYTHON_VERSION}" --seed "${ENV_NAME}"
 
-# Activate so all subsequent pip/uv commands target this env
-# shellcheck source=/dev/null
 source "${ENV_NAME}/bin/activate"
 
 echo "Activated: $(which python) → $(python --version)"
@@ -137,8 +132,6 @@ uv pip install "isaacsim[all,extscache]==${ISAAC_SIM_VERSION}" \
 
 log "Installing PyTorch ${TORCH_VERSION} (CUDA)"
 
-# We install a CUDA-aware build from PyTorch's own index, NOT the default PyPI,
-# because the default PyPI torch is CPU-only and will silently break GPU training
 uv pip install \
     "torch==${TORCH_VERSION}" \
     "torchvision==${TORCHVISION_VERSION}" \
@@ -160,8 +153,7 @@ fi
 
 cd IsaacLab
 
-# Hard-reset to the pinned commit — this is what makes the install reproducible.
-# Unlike a branch pointer, a SHA is immutable.
+# Hard-reset to the pinned commit
 git fetch origin
 git checkout "${ISAAC_LAB_COMMIT}"
 
@@ -173,14 +165,7 @@ echo "Isaac Lab HEAD: $(git log -1 --oneline)"
 
 log "Installing Isaac Lab extensions (target: ${ISAACLAB_INSTALL_TARGET})"
 
-# isaaclab.sh --install iterates over all packages in source/ and installs them
-# with "pip install --editable", meaning your source edits are reflected
-# immediately without needing to reinstall — great for thesis experiments.
-#
-# It also detects the active virtual env and uses "uv pip" automatically
-# when uv is available.
 ./isaaclab.sh --install "${ISAACLAB_INSTALL_TARGET}"
-
 
 # ==============================================================================
 # ── STEP 7: Install your project (RT_IL) ─────────────────────────────────────
