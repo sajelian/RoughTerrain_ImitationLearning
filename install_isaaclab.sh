@@ -193,7 +193,7 @@ log "Installing RT_IL project"
 # directly — no reinstall needed when you change your code during experiments.
 # We use "python -m pip" (rather than bare "pip") to guarantee we're using the
 # pip that belongs to the currently active virtual environment.
-python -m pip install -e source/RT_IL
+python -m pip install -e ../source/RT_IL
 
 # ==============================================================================
 # ── DONE ──────────────────────────────────────────────────────────────────────
