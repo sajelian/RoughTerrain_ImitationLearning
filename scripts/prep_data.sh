@@ -2,10 +2,9 @@
 set -euo pipefail
 
 # ---------------- user config ----------------
-ISAACLAB_SETUP="${HOME}/IsaacLab/_isaac_sim/setup_conda_env.sh"
-ENV_ISAACLAB="isaaclab"
+ENV_ISAACLAB="env_isaaclab"
 ENV_GMR="gmr_custom"
-ENV_MESH="isaaclab" # was mesh but they dont really differ
+ENV_MESH="env_isaaclab" # was mesh but they dont really differ
 
 # External GMR repo script
 GMR_REPO="${GMR_REPO:-${HOME}/GMR}"
