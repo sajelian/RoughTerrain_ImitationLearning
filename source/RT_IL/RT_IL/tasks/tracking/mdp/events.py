@@ -6,10 +6,128 @@ from typing import TYPE_CHECKING, Literal
 import isaaclab.utils.math as math_utils
 from isaaclab.assets import Articulation
 from isaaclab.envs.mdp.events import _randomize_prop_by_op
-from isaaclab.managers import SceneEntityCfg
+from isaaclab.managers import ManagerTermBase, SceneEntityCfg
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
+
+
+class RandomFootWrench(ManagerTermBase):
+    """Apply short random wrenches to selected foot links at random intervals."""
+
+    def __init__(self, cfg, env: ManagerBasedEnv):
+        super().__init__(cfg, env)
+
+        self.asset_cfg: SceneEntityCfg = cfg.params["asset_cfg"]
+        self.asset: Articulation = env.scene[self.asset_cfg.name]
+        self.time_until_next = torch.zeros(env.num_envs, device=self.asset.device)
+        self.active_time_left = torch.zeros(env.num_envs, device=self.asset.device)
+        self.is_active = torch.zeros(env.num_envs, dtype=torch.bool, device=self.asset.device)
+
+        event_interval_range_s = cfg.params["event_interval_range_s"]
+        self.time_until_next[:] = math_utils.sample_uniform(
+            event_interval_range_s[0],
+            event_interval_range_s[1],
+            (env.num_envs,),
+            self.asset.device,
+        )
+
+    def reset(self, env_ids=None) -> None:
+        if env_ids is None:
+            env_ids = torch.arange(self.num_envs, device=self.asset.device)
+        elif not isinstance(env_ids, torch.Tensor):
+            env_ids = torch.tensor(env_ids, device=self.asset.device, dtype=torch.long)
+        else:
+            env_ids = env_ids.to(device=self.asset.device)
+        self._clear_wrench(env_ids)
+        self.is_active[env_ids] = False
+        self.active_time_left[env_ids] = 0.0
+        event_interval_range_s = self.cfg.params["event_interval_range_s"]
+        self.time_until_next[env_ids] = math_utils.sample_uniform(
+            event_interval_range_s[0],
+            event_interval_range_s[1],
+            (len(env_ids),),
+            self.asset.device,
+        )
+
+    def __call__(
+        self,
+        env: ManagerBasedEnv,
+        env_ids: torch.Tensor | None,
+        asset_cfg: SceneEntityCfg,
+        force_range: dict[str, tuple[float, float]],
+        torque_range: dict[str, tuple[float, float]],
+        event_interval_range_s: tuple[float, float],
+        duration_range_s: tuple[float, float],
+    ):
+        if env_ids is None:
+            env_ids = torch.arange(env.num_envs, device=self.asset.device)
+
+        dt = env.step_dt
+        active_env_ids = env_ids[self.is_active[env_ids]]
+        if len(active_env_ids) > 0:
+            self.active_time_left[active_env_ids] -= dt
+            ended_env_ids = active_env_ids[self.active_time_left[active_env_ids] <= 0.0]
+            if len(ended_env_ids) > 0:
+                self._clear_wrench(ended_env_ids)
+                self.is_active[ended_env_ids] = False
+                self.active_time_left[ended_env_ids] = 0.0
+                self.time_until_next[ended_env_ids] = math_utils.sample_uniform(
+                    event_interval_range_s[0],
+                    event_interval_range_s[1],
+                    (len(ended_env_ids),),
+                    self.asset.device,
+                )
+
+        inactive_env_ids = env_ids[~self.is_active[env_ids]]
+        if len(inactive_env_ids) == 0:
+            return
+
+        self.time_until_next[inactive_env_ids] -= dt
+        start_env_ids = inactive_env_ids[self.time_until_next[inactive_env_ids] <= 0.0]
+        if len(start_env_ids) == 0:
+            return
+
+        self._apply_random_wrench(start_env_ids, asset_cfg, force_range, torque_range)
+        self.is_active[start_env_ids] = True
+        self.active_time_left[start_env_ids] = math_utils.sample_uniform(
+            duration_range_s[0],
+            duration_range_s[1],
+            (len(start_env_ids),),
+            self.asset.device,
+        )
+
+    def _apply_random_wrench(
+        self,
+        env_ids: torch.Tensor,
+        asset_cfg: SceneEntityCfg,
+        force_range: dict[str, tuple[float, float]],
+        torque_range: dict[str, tuple[float, float]],
+    ) -> None:
+        num_bodies = len(asset_cfg.body_ids) if isinstance(asset_cfg.body_ids, list) else self.asset.num_bodies
+        forces = self._sample_axis_ranges(force_range, (len(env_ids), num_bodies, 3))
+        torques = self._sample_axis_ranges(torque_range, (len(env_ids), num_bodies, 3))
+        self.asset.permanent_wrench_composer.set_forces_and_torques(
+            forces=forces,
+            torques=torques,
+            body_ids=asset_cfg.body_ids,
+            env_ids=env_ids,
+        )
+
+    def _clear_wrench(self, env_ids: torch.Tensor) -> None:
+        num_bodies = len(self.asset_cfg.body_ids) if isinstance(self.asset_cfg.body_ids, list) else self.asset.num_bodies
+        zeros = torch.zeros((len(env_ids), num_bodies, 3), device=self.asset.device)
+        self.asset.permanent_wrench_composer.set_forces_and_torques(
+            forces=zeros,
+            torques=zeros,
+            body_ids=self.asset_cfg.body_ids,
+            env_ids=env_ids,
+        )
+
+    def _sample_axis_ranges(self, axis_range: dict[str, tuple[float, float]], size: tuple[int, int, int]) -> torch.Tensor:
+        range_list = [axis_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z"]]
+        ranges = torch.tensor(range_list, device=self.asset.device)
+        return math_utils.sample_uniform(ranges[:, 0], ranges[:, 1], size, self.asset.device)
 
 
 def randomize_joint_default_pos(

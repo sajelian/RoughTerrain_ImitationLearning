@@ -75,7 +75,7 @@ RESET_VELOCITY_RANGE = {
 
 
 PROPIO_HISTORY_SHORT = 5
-PROPIO_HISTORY_LONG = 5
+PROPIO_HISTORY_LONG = 8
 
 
 ##
@@ -173,7 +173,7 @@ class CommandsCfg:
         },
         velocity_range=RESET_VELOCITY_RANGE,
         joint_position_range=(-0.1, 0.1),
-        start_xy_noise_std=0.25,  # keep this < 0.3 or episode will terminate immediately
+        start_xy_noise_std=0.1,  # keep this < 0.3 or episode will terminate immediately
     )
 
 
@@ -283,6 +283,108 @@ class ObservationsCfg_TRAIN:
 
 
 @configclass
+class ObservationsCfg_DEPLOY:
+    """Observation specifications for the MDP."""
+
+    @configclass
+    class PolicyCfg(ObsGroup):
+        """Observations for policy group."""
+
+        command = ObsTerm(
+            func=mdp.generated_commands, params={"command_name": "motion"}
+        )
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+            history_length=PROPIO_HISTORY_SHORT,
+        )
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel,
+            scale=0.2,
+            noise=Unoise(n_min=-0.2, n_max=0.2),
+            history_length=PROPIO_HISTORY_LONG,
+        )
+        projected_gravity = ObsTerm(
+            func=mdp.projected_gravity,
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+            history_length=PROPIO_HISTORY_SHORT,
+        )
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=Unoise(n_min=-0.01, n_max=0.01),
+            history_length=PROPIO_HISTORY_LONG,
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=Unoise(n_min=-0.5, n_max=0.5),
+            scale=0.05,
+            history_length=PROPIO_HISTORY_LONG,
+        )
+        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_SHORT)
+        height_scan = ObsTerm(
+            func=mdp.noised_height_scan,
+            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+            noise=Unoise(n_min=-0.1, n_max=0.1),
+            clip=(-1.0, 1.0)
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+
+    @configclass
+    class CriticCfg(ObsGroup):
+        command = ObsTerm(
+            func=mdp.generated_commands, params={"command_name": "motion"}
+        )
+        root_pos = ObsTerm(
+            func=mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("robot")}
+        )
+        root_quat = ObsTerm(
+            func=mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("robot")}
+        )
+        motion_anchor_pos_b = ObsTerm(
+            func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}
+        )
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b, params={"command_name": "motion"}
+        )
+        body_pos = ObsTerm(func=mdp.robot_body_pos_b, params={"command_name": "motion"})
+        body_ori = ObsTerm(func=mdp.robot_body_ori_b, params={"command_name": "motion"})
+        motion_body_pos_b = ObsTerm(
+            func=mdp.motion_body_pos_b, params={"command_name": "motion"}
+        )
+        motion_body_ori_b = ObsTerm(
+            func=mdp.motion_body_ori_b, params={"command_name": "motion"}
+        )
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        actions = ObsTerm(func=mdp.last_action)
+
+        height_scan = ObsTerm(
+            func=mdp.height_scan,
+            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+            clip=(-1.0, 1.0),
+        )
+
+        ankle_forces = ObsTerm(
+            func=mdp.body_incoming_wrench,
+            params={
+                "asset_cfg": SceneEntityCfg(
+                    "robot",
+                    body_names=["left_ankle_roll_link", "right_ankle_roll_link"],
+                )
+            },
+        )
+
+    # observation groups
+    policy: PolicyCfg = PolicyCfg()
+    critic: CriticCfg = CriticCfg()
+
+@configclass
 class ObservationsCfg_DISTILLATION(ObservationsCfg_TRAIN):
     """Observation specifications for the MDP."""
 
@@ -388,7 +490,7 @@ class RewardsCfg:
     # TODO tune this to match the actual forces observed in the reference
     foot_contact_schedule = RewTerm(
         func=mdp.foot_contact_schedule_sparse,
-        weight=4.0,
+        weight=2.0,
         params={
             "command_name": "motion",
             "sensor_cfg": SceneEntityCfg(
@@ -428,7 +530,7 @@ class RewardsCfg:
 
     motion_global_anchor_pos = RewTerm(
         func=mdp.motion_global_anchor_position_error_exp,
-        weight=2.0,
+        weight=2.5,
         params={"command_name": "motion", "std": 0.3},
     )
     motion_global_anchor_ori = RewTerm(
@@ -438,7 +540,7 @@ class RewardsCfg:
     )
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_error_exp,
-        weight=0.5,
+        weight=1.0,
         params={"command_name": "motion", "std": 0.3},
     )
     motion_body_ori = RewTerm(
@@ -457,7 +559,7 @@ class RewardsCfg:
         params={"command_name": "motion", "std": 3.14},
     )
     # TODO check if this helps remove the shaky behavior
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.1)
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.2)
     l1_joint_vel = RewTerm(
         func=mdp.joint_vel_l1,
         weight=-0.05,
@@ -470,7 +572,7 @@ class RewardsCfg:
     )
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
-        weight=-0.1,
+        weight=-0.5,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
@@ -492,8 +594,8 @@ class TerminationsCfg:
         func=mdp.bad_anchor_pos,
         params={
             "command_name": "motion",
-            "threshold_xy": 0.75,
-            "threshold_z": 0.45,
+            "threshold_xy": 0.25,
+            "threshold_z": 0.22,
         },  # full 3D norm: catches xy drift under absolute tracking
     )
     anchor_ori = DoneTerm(
@@ -508,8 +610,8 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_xy_z,
         params={
             "command_name": "motion",
-            "threshold_xy": 0.45,
-            "threshold_z": 0.45,
+            "threshold_xy": 0.25,
+            "threshold_z": 0.25,
             "body_names": ["left_ankle_roll_link", "right_ankle_roll_link"],
         },
     )
@@ -553,7 +655,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 4
-        self.episode_length_s = 7.5  # this should be <= clip length
+        self.episode_length_s = 14.0  # this should be <= clip length
         # simulation settings
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation
