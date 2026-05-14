@@ -252,3 +252,5 @@ if __name__ == "__main__":
     main()
     # close sim app
     simulation_app.close()
+
+# convert': python source/RT_IL/RT_IL/utils/convert_mesh.py   data/terrains/prepared/obj/flat_box.obj   data/terrains/prepared/flat_box_convex/flat_box_convex   --make-instanceable   --collision-approximation convexDecomposition   --hull-vertex-limit 16   --max-convex-hulls 64   --voxel-resolution 2560000   --shrink-wrap --headless
