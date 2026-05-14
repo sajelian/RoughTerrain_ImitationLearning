@@ -49,6 +49,7 @@ apptainer exec --nv --writable-tmpfs --cleanenv \
     --env "PIP_CACHE_DIR=/tmp/pip_cache" \
     --env "TMPDIR=/tmp" \
     --env "WANDB_API_KEY=$WANDB_API_KEY" \
+    --env "WANDB_GROUP=${WANDB_GROUP:-}" \
     --env "WARP_CACHE_PATH=/tmp/warp_cache" \
     --env "http_proxy=$http_proxy" \
     --env "https_proxy=$https_proxy" \
