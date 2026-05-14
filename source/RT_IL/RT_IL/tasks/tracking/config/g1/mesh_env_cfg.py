@@ -88,6 +88,7 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
     def __post_init__(self):
         super().__post_init__()
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
+        self.scene.height_scanner.debug_vis = True
         # Viewer options for filming whole motions externally
         #self.viewer.eye = (0.9, 0.5, 2.4)
         #self.viewer.lookat = (0.0, -4.7, 0.0)
@@ -217,6 +218,7 @@ class G1MimicMeshEnvDeployCfg_PLAY(G1MeshEnvDeployCfg):
     def __post_init__(self):
         super().__post_init__()
         self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
+        self.scene.height_scanner.debug_vis = True
         # Viewer options for filming whole motions externally
         #self.viewer.eye = (0.9, 0.5, 2.4)
         #self.viewer.lookat = (0.0, -4.7, 0.0)
