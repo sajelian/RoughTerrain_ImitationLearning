@@ -489,7 +489,6 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
-    # TODO tune this to match the actual forces observed in the reference
     foot_contact_schedule = RewTerm(
         func=mdp.foot_contact_schedule_sparse,
         weight=2.0,
