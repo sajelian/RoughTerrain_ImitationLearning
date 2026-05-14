@@ -207,7 +207,7 @@ class G1MeshEnvDeployCfg(G1MeshEnvCfg):
             "z": (-0.00, 0.01),
             "roll": (-0.1, 0.1),
             "pitch": (-0.1, 0.1),
-            "yaw": (-0.5, 0.5),
+            "yaw": (-0.45, 0.45),
         }
 
         self.commands.motion.start_xy_noise_std = 0.125

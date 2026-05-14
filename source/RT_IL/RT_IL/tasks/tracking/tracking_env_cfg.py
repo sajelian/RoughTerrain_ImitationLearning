@@ -169,7 +169,7 @@ class CommandsCfg:
             "z": (-0.00, 0.01),
             "roll": (-0.1, 0.1),
             "pitch": (-0.1, 0.1),
-            "yaw": (-0.3, 0.3), #TODO might make this bigger
+            "yaw": (-0.1, 0.1),
         },
         velocity_range=RESET_VELOCITY_RANGE,
         joint_position_range=(-0.1, 0.1),
@@ -595,7 +595,7 @@ class TerminationsCfg:
         func=mdp.bad_anchor_pos,
         params={
             "command_name": "motion",
-            "threshold_xy": 0.25,
+            "threshold_xy": 0.35,
             "threshold_z": 0.22,
         },  # full 3D norm: catches xy drift under absolute tracking
     )
@@ -611,8 +611,8 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_xy_z,
         params={
             "command_name": "motion",
-            "threshold_xy": 0.25,
-            "threshold_z": 0.25,
+            "threshold_xy": 0.35,
+            "threshold_z": 0.35,
             "body_names": ["left_ankle_roll_link", "right_ankle_roll_link"],
         },
     )
