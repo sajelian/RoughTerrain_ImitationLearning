@@ -10,6 +10,8 @@ NUM_ENVS=16384
 MAX_ITERATIONS=2000
 SEEDS=(1 2 3 4 5)
 
+# usd must be copied to the cluster, motions can be fetched from the registry
+# take the atomic motions only (newest format and footlock given)
 declare -A PAIRS
 PAIRS[0]="sajelian-eth-zurich-org/wandb-registry-Motions/walking|flat"
 PAIRS[1]="sajelian-eth-zurich-org/wandb-registry-Motions/box_up|box"
