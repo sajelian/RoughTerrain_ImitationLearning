@@ -139,7 +139,7 @@ class MySceneCfg(InteractiveSceneCfg):
         history_length=0,
         offset=RayCasterCfg.OffsetCfg(pos=(0.4, 0.0, 20.0)),
         ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[1.2, 0.6]),
         debug_vis=False,
         mesh_prim_paths=[
             "/World/ground",
