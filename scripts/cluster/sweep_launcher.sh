@@ -34,7 +34,7 @@ for fcs in "${FOOT_CONTACT_OPTIONS[@]}"; do
     fi
 
     for seed in "${SEEDS[@]}"; do
-      export WANDB_GROUP="$GROUP"
+      export WANDB_RUN_GROUP="$GROUP"
 
       sbatch --export=ALL "$SBATCH" \
         "$SCRIPT" \

@@ -22,11 +22,12 @@ for fcs in "${FOOT_CONTACT_OPTIONS[@]}"; do
     IFS="|" read -r registry usd <<< "${PAIRS[$i]}"
 
     # runs differing only in seed are grouped together
-    GROUP="${fcs}_pair${i}_${usd}"
-    RUN_NAME_BASE="${fcs}_pair${i}"
+    motion=$(basename "$registry")
+    GROUP="${fcs}_${motion}"
+    RUN_NAME_BASE="${fcs}_${motion}"
 
     for seed in "${SEEDS[@]}"; do
-      export WANDB_GROUP="$GROUP"
+      export WANDB_RUN_GROUP="$GROUP"
 
       EXTRA_ARGS=()
       if [[ "$fcs" == "without_fcs" ]]; then
