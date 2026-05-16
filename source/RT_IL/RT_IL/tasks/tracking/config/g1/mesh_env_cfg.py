@@ -6,7 +6,7 @@ from isaaclab.sensors.ray_caster.patterns import patterns
 from isaaclab.utils import configclass
 from isaaclab.managers import EventTermCfg as EventTerm
 
-from RT_IL.robots.g1 import G1_CYLINDER_CFG, G1_HYBRID_ACTION_SCALE, G1_VIZ_CFG
+from RT_IL.robots.g1 import G1_CYLINDER_CFG, G1_FOOT_LINKS, G1_HYBRID_ACTION_SCALE, G1_VIZ_CFG
 from RT_IL.tasks.tracking.tracking_env_cfg import ObservationsCfg_DISTILLATION, ObservationsCfg_DEPLOY, TrackingEnvCfg
 from isaaclab.sensors.ray_caster import RayCasterCfg, MultiMeshRayCasterCfg
 
@@ -16,6 +16,35 @@ from isaaclab.assets import AssetBaseCfg
 import isaaclab.sim as sim_utils
 from RT_IL.tasks.tracking.mdp.commands import MotionCommand
 import RT_IL.tasks.tracking.mdp as mdp
+
+
+def _noised_mesh_scanner(
+    resolution: float, size: list, pos: tuple = (0.0, 0.0, 20.0)
+) -> NoisedMultiMeshRayCasterCfg:
+    """Build the NoisedMultiMeshRayCasterCfg used by deploy and distillation configs."""
+    return NoisedMultiMeshRayCasterCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/torso_link",
+        offset=RayCasterCfg.OffsetCfg(pos=pos),
+        ray_alignment="yaw",
+        pattern_cfg=patterns.GridPatternCfg(resolution=resolution, size=size),
+        debug_vis=False,
+        mesh_prim_paths=[
+            "/World/ground",
+            MultiMeshRayCasterCfg.RaycastTargetCfg(
+                prim_expr="{ENV_REGEX_NS}/obstacle",
+                is_shared=True,
+                track_mesh_transforms=False,
+            ),
+        ],
+    )
+
+
+def _configure_play_viewer(cfg) -> None:
+    """Apply viewer/camera settings shared by all PLAY configs."""
+    cfg.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
+    cfg.viewer.eye = (2.5, 2.5, 2.5)
+    cfg.viewer.resolution = (1920, 1080)
+    cfg.commands.motion.class_type = FixedStartMotionCommand
 
 
 class FixedStartMotionCommand(MotionCommand):
@@ -79,16 +108,8 @@ class G1MeshEnvCfg(TrackingEnvCfg):
 class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
     def __post_init__(self):
         super().__post_init__()
-        self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
+        _configure_play_viewer(self)
         self.scene.height_scanner.debug_vis = True
-        # Viewer options for filming whole motions externally
-        #self.viewer.eye = (0.9, 0.5, 2.4)
-        #self.viewer.lookat = (0.0, -4.7, 0.0)
-        #self.viewer.origin_type = "asset_root"
-        self.viewer.eye = (2.5, 2.5, 2.5)
-        self.viewer.resolution = (1920, 1080)
-        # always start from beginning of motion
-        self.commands.motion.class_type = FixedStartMotionCommand
         # reduce termination thresholds to show failures more clearly
         #self.terminations.anchor_pos = None
         # self.terminations.anchor_ori = None
@@ -114,20 +135,8 @@ class G1MeshEnvDeployCfg(G1MeshEnvCfg):
         # post init of parent
         super().__post_init__()
 
-        self.scene.height_scanner = NoisedMultiMeshRayCasterCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/torso_link",
-            offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
-            ray_alignment="yaw",
-            pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[0.5, 0.8]), # !!! flipped dimension for sideways beam!
-            debug_vis=False,
-            mesh_prim_paths=[
-                "/World/ground",
-                MultiMeshRayCasterCfg.RaycastTargetCfg(
-                    prim_expr="{ENV_REGEX_NS}/obstacle",
-                    is_shared=True,
-                    track_mesh_transforms=False,
-                ),
-            ],
+        self.scene.height_scanner = _noised_mesh_scanner(
+            resolution=0.05, size=[0.5, 0.8]  # flipped dimension for sideways beam
         )
 
         DEPLOY_PUSH_VELOCITY_RANGE = {
@@ -154,7 +163,7 @@ class G1MeshEnvDeployCfg(G1MeshEnvCfg):
             params={
                 "asset_cfg": SceneEntityCfg(
                     "robot",
-                    body_names=["left_ankle_roll_link", "right_ankle_roll_link"],
+                    body_names=G1_FOOT_LINKS,
                 ),
                 "force_range": {
                     "x": (-60.0, 60.0),
@@ -209,16 +218,8 @@ class G1MeshEnvDeployCfg(G1MeshEnvCfg):
 class G1MimicMeshEnvDeployCfg_PLAY(G1MeshEnvDeployCfg):
     def __post_init__(self):
         super().__post_init__()
-        self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
+        _configure_play_viewer(self)
         self.scene.height_scanner.debug_vis = True
-        # Viewer options for filming whole motions externally
-        #self.viewer.eye = (0.9, 0.5, 2.4)
-        #self.viewer.lookat = (0.0, -4.7, 0.0)
-        #self.viewer.origin_type = "asset_root"
-        self.viewer.eye = (2.5, 2.5, 2.5)
-        self.viewer.resolution = (1920, 1080)
-        # always start from beginning of motion
-        self.commands.motion.class_type = FixedStartMotionCommand
         # reduce termination thresholds to show failures more clearly
         # self.terminations.anchor_pos = None
         self.events.foot_perturbation = None
@@ -238,20 +239,8 @@ class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
         # post init of parent
         super().__post_init__()
 
-        self.scene.height_scanner = NoisedMultiMeshRayCasterCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/torso_link",
-            offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
-            ray_alignment="yaw",
-            pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
-            debug_vis=False,
-            mesh_prim_paths=[
-                "/World/ground",
-                MultiMeshRayCasterCfg.RaycastTargetCfg(
-                    prim_expr="{ENV_REGEX_NS}/obstacle",
-                    is_shared=True,
-                    track_mesh_transforms=False,
-                ),
-            ],
+        self.scene.height_scanner = _noised_mesh_scanner(
+            resolution=0.1, size=[1.6, 1.0]
         )
 
 
@@ -267,19 +256,9 @@ class G1MeshEnvCfg_DISTILLATIONPLAY(G1MeshEnvCfg_DISTILLATION):
         # post init of parent
         super().__post_init__()
 
+        _configure_play_viewer(self)
         self.commands.motion.debug_vis = False
-        self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
-
-        # Viewer options for filming whole motions externally
-        #self.viewer.eye = (0.9, 0.5, 2.4)
-        #self.viewer.lookat = (0.0, -4.7, 0.0)
-        #self.viewer.origin_type = "asset_root"
-        self.viewer.eye = (2.5, 2.5, 2.5)
-        self.viewer.resolution = (1920, 1080)
-        # always start from beginning of motion
-        self.commands.motion.class_type = FixedStartMotionCommand
         self.commands.motion.start_xy_noise_std = 0.0
-        # reduce termination thresholds to show failures more clearly
         self.terminations.anchor_pos = None
         self.terminations.anchor_ori = None
         self.terminations.ee_feet_pos = None
