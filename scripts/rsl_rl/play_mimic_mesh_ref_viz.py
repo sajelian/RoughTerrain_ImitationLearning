@@ -3,14 +3,15 @@
 """Launch Isaac Sim Simulator first."""
 
 import argparse
+import os
 import sys
-
-import yaml
 
 from isaaclab.app import AppLauncher
 
 # local imports
 import cli_args  # isort: skip
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from usd_utils import load_usd_config  # isort: skip
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
@@ -41,20 +42,12 @@ sys.argv = [sys.argv[0]] + hydra_args
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-# USD import and config
-usd_folder = "data/terrains/prepared/"
-usd_path = usd_folder + f"{args_cli.usd_name}/" + f"{args_cli.usd_name}" + ".usd"
-usd_cfg_path = usd_folder + f"{args_cli.usd_name}/" + "config.yaml"
-
-# Fetch config from yaml
-with open(usd_cfg_path, "r") as f:
-    usd_cfg: dict = yaml.load(f, Loader=yaml.FullLoader)
+usd_path, usd_cfg = load_usd_config(args_cli.usd_name)
 
 
 """Rest everything follows."""
 
 import gymnasium as gym
-import os
 import pathlib
 import torch
 

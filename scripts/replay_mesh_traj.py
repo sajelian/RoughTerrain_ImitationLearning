@@ -8,9 +8,9 @@ python scripts/replay_mesh_traj.py --registry_name=sajelian-eth-zurich-org/wandb
 import argparse
 import numpy as np
 import torch
-import yaml
 
 from isaaclab.app import AppLauncher
+from usd_utils import load_usd_config  # isort: skip
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Replay converted motions.")
@@ -28,15 +28,7 @@ args_cli = parser.parse_args()
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-# USD import and config
-usd_folder = "data/terrains/prepared/"
-usd_path = usd_folder + f"{args_cli.usd_name}/" + f"{args_cli.usd_name}" + ".usd"
-usd_cfg_path = usd_folder + f"{args_cli.usd_name}/" + "config.yaml"
-
-
-# Fetch config from yaml
-with open(usd_cfg_path, "r") as f:
-    usd_cfg: dict = yaml.load(f, Loader=yaml.FullLoader)
+usd_path, usd_cfg = load_usd_config(args_cli.usd_name)
 
 """Rest everything follows."""
 
