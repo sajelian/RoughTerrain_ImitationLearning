@@ -30,6 +30,7 @@ from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 import numpy as np
 
 import RT_IL.tasks.tracking.mdp as mdp
+from RT_IL.robots.g1 import G1_FOOT_LINKS, G1_HAND_LINKS
 
 from isaaclab.terrains.trimesh.utils import make_plane
 
@@ -272,7 +273,7 @@ class ObservationsCfg_TRAIN:
             params={
                 "asset_cfg": SceneEntityCfg(
                     "robot",
-                    body_names=["left_ankle_roll_link", "right_ankle_roll_link"],
+                    body_names=G1_FOOT_LINKS,
                 )
             },
         )
@@ -375,7 +376,7 @@ class ObservationsCfg_DEPLOY:
             params={
                 "asset_cfg": SceneEntityCfg(
                     "robot",
-                    body_names=["left_ankle_roll_link", "right_ankle_roll_link"],
+                    body_names=G1_FOOT_LINKS,
                 )
             },
         )
@@ -496,7 +497,7 @@ class RewardsCfg:
             "command_name": "motion",
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
-                body_names=["left_ankle_roll_link", "right_ankle_roll_link"],
+                body_names=G1_FOOT_LINKS,
             ),
             "std_normalized": 0.25,
             "robot_mass": 35.0,
@@ -509,10 +510,7 @@ class RewardsCfg:
         params={
             "command_name": "motion",
             "std": 0.3,
-            "body_names": [
-                "left_ankle_roll_link",
-                "right_ankle_roll_link",
-            ],
+            "body_names": G1_FOOT_LINKS,
         },
     )
 
@@ -522,10 +520,7 @@ class RewardsCfg:
         params={
             "command_name": "motion",
             "std": 0.25,
-            "body_names": [
-                "left_wrist_yaw_link",
-                "right_wrist_yaw_link",
-            ],
+            "body_names": G1_HAND_LINKS,
         },
     )
 
@@ -613,7 +608,7 @@ class TerminationsCfg:
             "command_name": "motion",
             "threshold_xy": 0.35,
             "threshold_z": 0.35,
-            "body_names": ["left_ankle_roll_link", "right_ankle_roll_link"],
+            "body_names": G1_FOOT_LINKS,
         },
     )
     ee_hand_pos = DoneTerm(
@@ -621,7 +616,7 @@ class TerminationsCfg:
         params={
             "command_name": "motion",
             "threshold": 0.8,
-            "body_names": ["left_wrist_yaw_link", "right_wrist_yaw_link"],
+            "body_names": G1_HAND_LINKS,
         },
     )
 

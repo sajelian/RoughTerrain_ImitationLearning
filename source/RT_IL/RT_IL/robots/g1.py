@@ -216,3 +216,38 @@ G1_HYBRID_ACTION_SCALE = {
     n: (1.0 if n in _LOCOMOTION_JOINTS else scale)
     for n, scale in G1_ACTION_SCALE.items()
 }
+
+G1_FOOT_LINKS: list[str] = ["left_ankle_roll_link", "right_ankle_roll_link"]
+G1_HAND_LINKS: list[str] = ["left_wrist_yaw_link", "right_wrist_yaw_link"]
+
+G1_DOF_JOINT_NAMES: list[str] = [
+    "left_hip_pitch_joint",
+    "left_hip_roll_joint",
+    "left_hip_yaw_joint",
+    "left_knee_joint",
+    "left_ankle_pitch_joint",
+    "left_ankle_roll_joint",
+    "right_hip_pitch_joint",
+    "right_hip_roll_joint",
+    "right_hip_yaw_joint",
+    "right_knee_joint",
+    "right_ankle_pitch_joint",
+    "right_ankle_roll_joint",
+    "waist_yaw_joint",
+    "waist_roll_joint",
+    "waist_pitch_joint",
+    "left_shoulder_pitch_joint",
+    "left_shoulder_roll_joint",
+    "left_shoulder_yaw_joint",
+    "left_elbow_joint",
+    "left_wrist_roll_joint",
+    "left_wrist_pitch_joint",
+    "left_wrist_yaw_joint",
+    "right_shoulder_pitch_joint",
+    "right_shoulder_roll_joint",
+    "right_shoulder_yaw_joint",
+    "right_elbow_joint",
+    "right_wrist_roll_joint",
+    "right_wrist_pitch_joint",
+    "right_wrist_yaw_joint",
+]

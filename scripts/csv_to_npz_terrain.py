@@ -136,7 +136,7 @@ from isaaclab.utils.math import axis_angle_from_quat, quat_conjugate, quat_mul, 
 ##
 # Pre-defined configs
 ##
-from RT_IL.robots.g1 import G1_VIZ_CFG
+from RT_IL.robots.g1 import G1_VIZ_CFG, G1_FOOT_LINKS, G1_HAND_LINKS, G1_DOF_JOINT_NAMES
 
 
 @configclass
@@ -430,7 +430,7 @@ def align_motion_to_terrain(log, wp_mesh, mesh_vertices, device):
     T = body_pos_w.shape[0]
     fps = log["fps"][0] if isinstance(log["fps"], (list, np.ndarray)) else log["fps"]
 
-    foot_names = ["left_ankle_roll_link", "right_ankle_roll_link"]
+    foot_names = G1_FOOT_LINKS
     foot_idx = [body_names.index(n) for n in foot_names]
 
     # Ankle-to-sole offset: collision cylinders at z=-0.025 with radius 0.01 → sole is 0.035m below ankle frame
@@ -720,7 +720,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joi
     from scipy.spatial import KDTree
 
     HAND_CLIP_DIST = 0.03  # 3cm — if hand link is closer than this to mesh, mark as clipping
-    hand_names = ["left_wrist_yaw_link", "right_wrist_yaw_link"]
+    hand_names = G1_HAND_LINKS
     body_names = list(log["body_names"])
     hand_idx = [body_names.index(n) for n in hand_names]
 
@@ -866,37 +866,7 @@ def main():
     run_simulator(
         sim,
         scene,
-        joint_names=[
-            "left_hip_pitch_joint",
-            "left_hip_roll_joint",
-            "left_hip_yaw_joint",
-            "left_knee_joint",
-            "left_ankle_pitch_joint",
-            "left_ankle_roll_joint",
-            "right_hip_pitch_joint",
-            "right_hip_roll_joint",
-            "right_hip_yaw_joint",
-            "right_knee_joint",
-            "right_ankle_pitch_joint",
-            "right_ankle_roll_joint",
-            "waist_yaw_joint",
-            "waist_roll_joint",
-            "waist_pitch_joint",
-            "left_shoulder_pitch_joint",
-            "left_shoulder_roll_joint",
-            "left_shoulder_yaw_joint",
-            "left_elbow_joint",
-            "left_wrist_roll_joint",
-            "left_wrist_pitch_joint",
-            "left_wrist_yaw_joint",
-            "right_shoulder_pitch_joint",
-            "right_shoulder_roll_joint",
-            "right_shoulder_yaw_joint",
-            "right_elbow_joint",
-            "right_wrist_roll_joint",
-            "right_wrist_pitch_joint",
-            "right_wrist_yaw_joint",
-        ],
+        joint_names=G1_DOF_JOINT_NAMES,
     )
 
 
