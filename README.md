@@ -10,6 +10,8 @@
 <!-- [[Arxiv]](https://arxiv.org/abs/2508.08241) -->
 <!-- [[Video]](https://youtu.be/RS_MtKVIAzY) -->
 
+![G1 rough terrain motion tracking demo](docs/images/demo.gif)
+
 ## Overview
 
 This repository implements motion tracking over rough terrains for a Unitree G1 robot using feature-based imitation learning. (It acts as the expert-policy collection subcomponent of the HumanoidRTT framework. TBD)
