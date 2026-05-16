@@ -71,7 +71,7 @@ def main() -> None:
     data["pose_body"] = data.pop("body_pose")
     data["root_orient"] = data.pop("global_orient")
     data["trans"] = data.pop("transl")
-    data["gender"] = "male"  # TODO check if final data has this, then drop it
+    data["gender"] = "male"
 
     # save
     np.savez(output_path, **data)

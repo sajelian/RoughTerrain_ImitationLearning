@@ -231,7 +231,6 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
   USD_FILE="${USD_SUBDIR}/${cropped_stem}.usd"
   mkdir -p "${USD_SUBDIR}"
 
-  # TODO the folder setup seems corrupted, its not creating a subfolder for the cropped obj
   echo
   echo "== Step 5: convert_mesh.py (isaaclab) =="
   echo "USD output     : ${USD_FILE}"

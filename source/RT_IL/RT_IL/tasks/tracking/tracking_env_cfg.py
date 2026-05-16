@@ -489,7 +489,7 @@ class EventCfg:
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
-
+    # global tracking
     foot_contact_schedule = RewTerm(
         func=mdp.foot_contact_schedule_sparse,
         weight=2.0,
@@ -503,7 +503,6 @@ class RewardsCfg:
             "robot_mass": 35.0,
         },
     )
-
     motion_global_feet_body_pos = RewTerm(
         func=mdp.motion_global_body_position_error_exp,
         weight=1.0,
@@ -513,7 +512,6 @@ class RewardsCfg:
             "body_names": G1_FOOT_LINKS,
         },
     )
-
     motion_global_hand_body_pos = RewTerm(
         func=mdp.motion_global_body_position_error_exp,
         weight=0.5,
@@ -523,7 +521,6 @@ class RewardsCfg:
             "body_names": G1_HAND_LINKS,
         },
     )
-
     motion_global_anchor_pos = RewTerm(
         func=mdp.motion_global_anchor_position_error_exp,
         weight=2.5,
@@ -534,6 +531,7 @@ class RewardsCfg:
         weight=0.5,
         params={"command_name": "motion", "std": 0.4},
     )
+    # body tracking 
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_error_exp,
         weight=1.0,
@@ -554,7 +552,7 @@ class RewardsCfg:
         weight=0.5,
         params={"command_name": "motion", "std": 3.14},
     )
-    # TODO check if this helps remove the shaky behavior
+    # regularization
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.2)
     l1_joint_vel = RewTerm(
         func=mdp.joint_vel_l1,

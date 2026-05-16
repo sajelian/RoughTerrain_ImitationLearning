@@ -155,8 +155,8 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_top1_bin"] = torch.zeros(self.num_envs, device=self.device)
 
     @property
-    def command(self) -> torch.Tensor:  # TODO Consider again if this is the best observation
-        return torch.cat([self.joint_pos, self.joint_vel], dim=1)  # no phase only joint pos and vel
+    def command(self) -> torch.Tensor:
+        return torch.cat([self.joint_pos, self.joint_vel], dim=1)
 
     @property
     def joint_pos(self) -> torch.Tensor:

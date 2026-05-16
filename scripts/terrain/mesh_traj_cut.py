@@ -113,7 +113,7 @@ traj_segments = len(traj_vertices) - 1
 entities = [trimesh.path.entities.Line(np.array([i, i + 1])) for i in range(traj_segments)] if traj_segments > 0 else []
 trajectory_path = trimesh.path.Path3D(vertices=traj_vertices, entities=entities)
 
-# mark the start and end points with green and red spheres # TODO could also do cones and use orientation aswell
+# mark the start and end points with green and red spheres
 start_sphere = trimesh.creation.icosphere(radius=0.1, subdivisions=3)
 start_sphere.apply_translation(trajectory.iloc[0, 0:3].to_numpy())
 start_sphere.visual.face_colors = [0, 255, 0, 255]
@@ -121,8 +121,8 @@ end_sphere = trimesh.creation.icosphere(radius=0.1, subdivisions=3)
 end_sphere.apply_translation(trajectory.iloc[-1, 0:3].to_numpy())
 end_sphere.visual.face_colors = [255, 0, 0, 255]
 
-tube_radius = 1.32  # TODO tune
-tube_offset = np.array([0.0, 0.0, -0.66])  # TODO tune
+tube_radius = 1.32  # half-width of kept corridor in metres; increase to keep more mesh around the path
+tube_offset = np.array([0.0, 0.0, -0.66])  # shifts tube centre below trajectory height so it spans ground level
 traj_points = trajectory.iloc[:, 0:3].to_numpy() + tube_offset
 segment_starts = traj_points[:-1]
 segment_ends = traj_points[1:]

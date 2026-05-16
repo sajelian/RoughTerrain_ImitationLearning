@@ -255,7 +255,7 @@ class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
         )
 
 
-        # TODO: consider relaxing termination thresholds for student training
+        # Uncomment to relax termination thresholds if the teacher policy is too strict for distillation.
         # self.terminations.anchor_pos.params["threshold_xy"] = 1.0
         # self.terminations.anchor_pos.params["threshold_z"] = 0.4
 
