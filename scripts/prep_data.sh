@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # ---------------- user config ----------------
-ENV_ISAACLAB="env_isaaclab"
+VENV_ISAACLAB="${HOME}/RT_IL/env_isaaclab"
 ENV_GMR="gmr_custom"
-ENV_MESH="env_isaaclab" # was mesh but they dont really differ
+VENV_MESH="${HOME}/RT_IL/env_isaaclab" # was mesh but they dont really differ
 
 # External GMR repo script
 GMR_REPO="${GMR_REPO:-${HOME}/GMR}"
@@ -49,7 +49,7 @@ MESH_OUT_DIR="data/terrains/prepared"
 CROPPED_OBJ_DIR="data/terrains/prepared/obj"
 MESH_CUT_SCRIPT="${HOME}/RT_IL/scripts/terrain/mesh_traj_cut.py"
 SKIP_MESH=0
-    
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --motion-npz) MOTION_NPZ="$2"; shift 2 ;;
@@ -115,23 +115,15 @@ echo "Frame range     : ${FRAME_RANGE:-all}"
 echo "W&B name        : ${OUTPUT_NAME}"
 echo
 
-# Helper: run a command in IsaacLab env with required sourcing, isolated in a subshell
+# Helper: run a command in IsaacLab venv, isolated in a subshell
 run_in_isaaclab() {
   (
-    source "$(conda info --base)/etc/profile.d/conda.sh"
-    conda activate "${ENV_ISAACLAB}"
-
-    # IsaacLab setup script assumes ZSH_VERSION may be unset; avoid 'set -u' crash.
-    #set +u
-    #source "${ISAACLAB_SETUP}"
-    #set -u
-
+    source "${VENV_ISAACLAB}/bin/activate"
     "$@"
   )
 }
 
-
-# Helper: run a command in gmr env isolated in a subshell
+# Helper: run a command in gmr env (conda), isolated in a subshell
 run_in_gmr() {
   (
     source "$(conda info --base)/etc/profile.d/conda.sh"
@@ -140,11 +132,10 @@ run_in_gmr() {
   )
 }
 
-# Helper: run a command in mesh env isolated in a subshell
+# Helper: run a command in mesh venv, isolated in a subshell
 run_in_mesh() {
   (
-    source "$(conda info --base)/etc/profile.d/conda.sh"
-    conda activate "${ENV_MESH}"
+    source "${VENV_MESH}/bin/activate"
     "$@"
   )
 }
