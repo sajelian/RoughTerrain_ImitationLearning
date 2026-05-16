@@ -182,15 +182,6 @@ run_in_isaaclab python scripts/data_handling/post_retargeting.py \
 [[ -f "${RDY_CSV}" ]] || { echo "Expected file not found: ${RDY_CSV}" >&2; exit 1; }
 echo
 
-# TODO the csv script is timing out during upload to W&B
-# ---- 4) csv_to_npz.py (env_isaaclab + IsaacLab setup) ----
-echo "== Step 4: csv_to_npz.py (isaaclab) =="
-run_in_isaaclab python scripts/csv_to_npz.py \
-  --input_file "${RDY_CSV}" \
-  --input_fps 30 \
-  --output_name "${OUTPUT_NAME}" \
-  ${HEADLESS_FLAG}
-
 # Ensure final trajectory output is in OUT_DIR even when intermediates are temp
 if [[ "${KEEP_INTERMEDIATE}" -eq 0 ]]; then
   echo
@@ -223,7 +214,7 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
   CROPPED_OBJ="${CROPPED_OBJ_DIR}/${motion_name}_${terrain_name}_cropped.obj"
 
   echo
-  echo "== Step 5: mesh_traj_cut.py (mesh env) =="
+  echo "== Step 4: mesh_traj_cut.py (mesh env) =="
   echo "Trajectory CSV : ${FINAL_RDY_CSV}"
   echo "Mesh OBJ       : ${MESH_OBJ}"
   echo "Cropped OBJ    : ${CROPPED_OBJ}"
@@ -242,7 +233,7 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
 
   # TODO the folder setup seems corrupted, its not creating a subfolder for the cropped obj
   echo
-  echo "== Step 6: convert_mesh.py (isaaclab) =="
+  echo "== Step 5: convert_mesh.py (isaaclab) =="
   echo "USD output     : ${USD_FILE}"
   run_in_isaaclab python "${CONVERT_MESH_PY}" \
     "${CROPPED_OBJ}" \

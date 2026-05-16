@@ -503,6 +503,129 @@ def align_motion_to_terrain(log, wp_mesh, mesh_vertices, device):
     return log
 
 
+def _run_interactive_offset(sim: SimulationContext, scene: InteractiveScene, robot, log: dict) -> np.ndarray:
+    """Keyboard-driven root offset phase between Pass 1 and foot alignment.
+
+    Replays the recorded motion with a live spatial offset so the user can
+    visually assess motion/terrain alignment before committing.
+
+    Keys (conflict-free with Isaac Sim viewport):
+        ← / →      ±X          ↑ / ↓      ±Y          PgUp / PgDn   ±Z
+        Numpad + / -   step ×2 / ÷2
+        Enter      accept      Backspace   reset offset to zero
+    """
+    if getattr(args_cli, "headless", False):
+        return np.zeros(3)
+
+    import carb.input as carb_input
+    import omni.appwindow
+
+    state = {
+        "offset": np.zeros(3),
+        "step": 0.05,
+        "dirty": True,
+        "done": False,
+        "reset": False,
+    }
+
+    input_iface = carb_input.acquire_input_interface()
+    keyboard = omni.appwindow.get_default_app_window().get_keyboard()
+    KEY = carb_input.KeyboardInput
+    EV = carb_input.KeyboardEventType
+
+    def _on_key(event, *_):
+        t = event.type
+        if t not in (EV.KEY_PRESS, EV.KEY_REPEAT):
+            return True
+        k = event.input
+        s = state["step"]
+        if   k == KEY.RIGHT:         state["offset"][0] += s
+        elif k == KEY.LEFT:          state["offset"][0] -= s
+        elif k == KEY.UP:            state["offset"][1] += s
+        elif k == KEY.DOWN:          state["offset"][1] -= s
+        elif k == KEY.PAGE_UP:       state["offset"][2] += s
+        elif k == KEY.PAGE_DOWN:     state["offset"][2] -= s
+        elif k == KEY.NUMPAD_ADD:    state["step"] = min(state["step"] * 2.0, 1.0)
+        elif k == KEY.NUMPAD_SUB:    state["step"] = max(state["step"] / 2.0, 0.001)
+        elif k == KEY.ENTER:         state["done"] = True
+        elif k == KEY.BACKSPACE:     state["reset"] = True
+        state["dirty"] = True
+        return True
+
+    sub = input_iface.subscribe_to_keyboard_events(keyboard, _on_key)
+
+    T_total = log["body_pos_w"].shape[0]
+    replay_idx = 0
+    dt = sim.get_physics_dt()
+
+    print(
+        "\n[OFFSET] Interactive offset — ←/→=±X  ↑/↓=±Y  PgUp/PgDn=±Z  Num+/-=step"
+        "  Enter=accept  Backspace=reset"
+    )
+    print(f"[OFFSET] offset=(+0.000, +0.000, +0.000)m  step=0.050m", end="", flush=True)
+
+    while simulation_app.is_running() and not state["done"]:
+        if state["reset"]:
+            state["offset"][:] = 0.0
+            state["reset"] = False
+            state["dirty"] = True
+
+        if state["dirty"]:
+            o = state["offset"]
+            print(
+                f"\r[OFFSET] offset=({o[0]:+.3f}, {o[1]:+.3f}, {o[2]:+.3f})m"
+                f"  step={state['step']:.3f}m  [Enter=accept  Esc=reset]",
+                end="",
+                flush=True,
+            )
+            state["dirty"] = False
+
+        disp_pos = log["body_pos_w"][replay_idx, 0] + state["offset"]
+        root_states = robot.data.default_root_state.clone()
+        root_states[:, :3] = torch.tensor(disp_pos, dtype=torch.float32, device=sim.device)
+        root_states[:, 3:7] = torch.tensor(log["body_quat_w"][replay_idx, 0], dtype=torch.float32, device=sim.device)
+        root_states[:, 7:10] = torch.tensor(log["body_lin_vel_w"][replay_idx, 0], dtype=torch.float32, device=sim.device)
+        root_states[:, 10:] = torch.tensor(log["body_ang_vel_w"][replay_idx, 0], dtype=torch.float32, device=sim.device)
+        robot.write_root_state_to_sim(root_states)
+
+        jp = torch.tensor(log["joint_pos"][replay_idx], dtype=torch.float32, device=sim.device).unsqueeze(0)
+        jv = torch.tensor(log["joint_vel"][replay_idx], dtype=torch.float32, device=sim.device).unsqueeze(0)
+        robot.write_joint_state_to_sim(jp, jv)
+
+        sim.render()
+        scene.update(dt)
+
+        replay_idx = (replay_idx + 1) % T_total
+
+    input_iface.unsubscribe_to_keyboard_events(keyboard, sub)
+    print()
+
+    accepted = state["offset"].copy()
+    print(f"[OFFSET] Accepted: ({accepted[0]:+.3f}, {accepted[1]:+.3f}, {accepted[2]:+.3f})m")
+    return accepted
+
+
+def _save_output_csv(log: dict, robot_joint_indexes: list, env_origin: np.ndarray, output_name: str) -> str:
+    """Write a CSV from the processed log in the same column layout as the input CSV.
+
+    Columns: root_pos(3)  root_rot_xyzw(4)  dof_pos(N)
+    Root position is in motion-local frame (world-frame minus env_origin).
+    """
+    root_pos = log["body_pos_w"][:, 0, :] - env_origin  # (T, 3)
+    root_quat_wxyz = log["body_quat_w"][:, 0, :]         # (T, 4) wxyz
+    root_quat_xyzw = root_quat_wxyz[:, [1, 2, 3, 0]]     # → xyzw for CSV
+    dof_pos = log["joint_pos"][:, robot_joint_indexes]    # (T, N_dof)
+
+    data = np.concatenate([root_pos, root_quat_xyzw, dof_pos], axis=1)
+
+    import os
+    out_dir = os.path.dirname(os.path.abspath(args_cli.input_file))
+    csv_path = os.path.join(out_dir, f"{output_name}.csv")
+    np.savetxt(csv_path, data, delimiter=",", fmt="%.6f")
+    print(f"[CSV] Saved {data.shape[0]} frames → {csv_path}")
+    return csv_path
+
+
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joint_names: list[str]):
     """Runs the simulation loop."""
     # Load motion
@@ -581,6 +704,15 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joi
     print(f"[PASS 1] Done. Recorded {T} frames.")
 
     # =========================================================================
+    # Interactive root offset — keyboard XY/Z adjustment before foot alignment
+    # =========================================================================
+    env_origin = scene.env_origins[0].cpu().numpy()
+    offset = _run_interactive_offset(sim, scene, robot, log)
+    if np.any(offset != 0.0):
+        log["body_pos_w"] += offset[None, None, :]
+        print(f"[OFFSET] Baked ({offset[0]:+.3f}, {offset[1]:+.3f}, {offset[2]:+.3f})m into {T} frames.")
+
+    # =========================================================================
     # Foot vertical alignment (raycasting) — fix root z before contact resolve
     # =========================================================================
     obstacle_prim_path = "/World/envs/env_0/obstacle"
@@ -653,6 +785,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joi
     logged_artifact = run.log_artifact(artifact_or_path="/tmp/motion.npz", name=COLLECTION, type=REGISTRY)
     run.link_artifact(artifact=logged_artifact, target_path=f"wandb-registry-{REGISTRY}/{COLLECTION}")
     print(f"[INFO]: Motion saved to wandb registry: {REGISTRY}/{COLLECTION}")
+    _save_output_csv(log, robot_joint_indexes, env_origin, args_cli.output_name)
 
     # =========================================================================
     # Replay the resolved motion with green/red RSI visualization
