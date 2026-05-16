@@ -101,7 +101,6 @@ else:
 
 trajectory = pandas.read_csv(args.trajectory)
 mesh = trimesh.load_mesh(args.mesh)
-show_scene = True
 
 # Offset the mesh by translation
 # # notice: new FORMAT has z already accounted for but keep this for old data
@@ -113,16 +112,6 @@ traj_vertices = trajectory.iloc[:, 0:3].to_numpy()
 traj_segments = len(traj_vertices) - 1
 entities = [trimesh.path.entities.Line(np.array([i, i + 1])) for i in range(traj_segments)] if traj_segments > 0 else []
 trajectory_path = trimesh.path.Path3D(vertices=traj_vertices, entities=entities)
-# somethings is buggy/changed through trimesh versions
-# if traj_segments > 0:
-#     trajectory_path.colors = np.linspace(
-#         [0, 255, 0, 255],
-#         [255, 0, 0, 255],
-#         num=traj_segments,
-#         dtype=np.uint8,
-#     )
-# else:
-#     trajectory_path.colors = np.array([[0, 255, 0, 255]], dtype=np.uint8)
 
 # mark the start and end points with green and red spheres # TODO could also do cones and use orientation aswell
 start_sphere = trimesh.creation.icosphere(radius=0.1, subdivisions=3)
@@ -187,27 +176,6 @@ print(f"  Done: {inside_vertices.sum()} vertices inside tube — {time.time()-t0
 
 faces_mask = inside_vertices[mesh.faces].all(axis=1)
 mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
-
-cut_z = False  # TODO this is buggy, don't use for now
-if cut_z:
-    if len(mesh.vertices):
-        vertices = mesh.vertices
-        below_traj = np.zeros(len(vertices), dtype=bool)
-
-        for start in range(0, len(vertices), chunk_size):
-            verts_chunk = vertices[start:start + chunk_size]
-            rel = verts_chunk[:, None, :] - segment_starts[None, :, :]
-            proj = np.einsum('ijk,jk->ij', rel, safe_dirs) / segment_length_sq
-            proj = np.clip(proj, 0.0, 1.0)
-            closest = segment_starts + proj[:, :, None] * safe_dirs
-            deltas = verts_chunk[:, None, :] - closest
-            dist_sq = np.einsum('ijk,ijk->ij', deltas, deltas)
-            min_idx = dist_sq.argmin(axis=1)
-            closest_z = closest[np.arange(len(verts_chunk)), min_idx, 2]
-            below_traj[start:start + chunk_size] = verts_chunk[:, 2] <= closest_z
-
-        faces_mask = below_traj[mesh.faces].all(axis=1)
-        mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
 
 scene = trimesh.Scene([mesh, trajectory_path, start_sphere, end_sphere])
 if not args.headless:
