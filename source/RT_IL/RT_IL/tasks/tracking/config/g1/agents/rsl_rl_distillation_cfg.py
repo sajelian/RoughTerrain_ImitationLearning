@@ -41,12 +41,3 @@ class G1MimicMeshDistillationRunnerCfg(RslRlDistillationRunnerCfg):
         gradient_length=8,
         max_grad_norm=1.0,
     )
-
-
-@configclass
-class UnitreeG1FlatDistillationRunnerCfg(G1MimicMeshDistillationRunnerCfg):
-    def __post_init__(self):
-        super().__post_init__()
-
-        self.student.hidden_dims = [128, 128, 128]
-        self.teacher.hidden_dims = [128, 128, 128]
