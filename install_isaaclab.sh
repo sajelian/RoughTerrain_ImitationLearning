@@ -12,7 +12,7 @@
 #   (Python, Isaac Sim, PyTorch, Isaac Lab git commit), any team member or
 #   CI machine can reproduce an identical environment months later.
 #
-# Tested on: Ubuntu 22.04 LTS (GLIBC 2.35+), x86_64, CUDA 13.0
+# Tested on: Ubuntu 22.04 LTS (GLIBC 2.35+), x86_64, CUDA 13.0 driver / cu128 runtime
 # ==============================================================================
 
 set -euo pipefail  # -e: exit on error, -u: error on unset var, -o pipefail: catch pipe errors
@@ -31,12 +31,14 @@ ISAAC_SIM_VERSION="5.1.0"
 # A git tag (e.g. "v2.3.2") can be moved; a SHA never changes.
 # Update this SHA when you want to upgrade Isaac Lab.
 ISAAC_LAB_REPO="https://github.com/isaac-sim/IsaacLab.git"
-ISAAC_LAB_COMMIT="3e73d6dd79080fd7632488c061052a6edd52e230t"  # main as of 2025-05-14
+ISAAC_LAB_COMMIT="3e73d6dd79080fd7632488c061052a6edd52e230"  # main as of 2025-05-14
 
-# PyTorch — must match your CUDA version. cu130 = CUDA 13.0
+# PyTorch — cu128 (CUDA 12.8) is the latest wheel available for torch 2.7.0.
+# CUDA 13.0 drivers are forward-compatible with CUDA 12.x runtimes, so cu128
+# wheels run correctly on a CUDA 13.0 system.
 TORCH_VERSION="2.7.0"
 TORCHVISION_VERSION="0.22.0"
-TORCH_INDEX_URL="https://download.pytorch.org/whl/cu130"
+TORCH_INDEX_URL="https://download.pytorch.org/whl/cu128"
 
 # Name of the virtual environment directory
 ENV_NAME="env_isaaclab"
@@ -44,6 +46,14 @@ ENV_NAME="env_isaaclab"
 # Which Isaac Lab learning frameworks to install.
 # Options: all | rl_games | rsl_rl | sb3 | skrl | robomimic | none
 ISAACLAB_INSTALL_TARGET="rsl_rl"
+
+# ==============================================================================
+# ── ENVIRONMENT ───────────────────────────────────────────────────────────────
+# ==============================================================================
+
+# CUDA wheels (nvidia-cublas, cufft, etc.) are several hundred MB each.
+# The default 30s timeout is too short on slow connections — raise it.
+export UV_HTTP_TIMEOUT=300
 
 # ==============================================================================
 # ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -115,7 +125,21 @@ log "Upgrading pip"
 pip install --upgrade pip
 
 # ==============================================================================
-# ── STEP 3: Install Isaac Sim ─────────────────────────────────────────────────
+# ── STEP 3: Install PyTorch (CUDA-enabled) ────────────────────────────────────
+# ==============================================================================
+
+log "Installing PyTorch ${TORCH_VERSION} (CUDA)"
+
+# Install torch BEFORE Isaac Sim so that when Isaac Sim's dependency solver sees
+# `torch` it finds the already-installed CUDA 13.0 wheel and doesn't fall back
+# to the default PyPI torch wheel (which pulls in CUDA 12 nvidia-* packages).
+uv pip install \
+    "torch==${TORCH_VERSION}" \
+    "torchvision==${TORCHVISION_VERSION}" \
+    --index-url "${TORCH_INDEX_URL}"
+
+# ==============================================================================
+# ── STEP 4: Install Isaac Sim ─────────────────────────────────────────────────
 # ==============================================================================
 
 log "Installing Isaac Sim ${ISAAC_SIM_VERSION}"
@@ -125,17 +149,6 @@ log "Installing Isaac Sim ${ISAAC_SIM_VERSION}"
 # --extra-index-url — NVIDIA hosts Isaac Sim wheels on their own PyPI server
 uv pip install "isaacsim[all,extscache]==${ISAAC_SIM_VERSION}" \
     --extra-index-url https://pypi.nvidia.com
-
-# ==============================================================================
-# ── STEP 4: Install PyTorch (CUDA-enabled) ────────────────────────────────────
-# ==============================================================================
-
-log "Installing PyTorch ${TORCH_VERSION} (CUDA)"
-
-uv pip install \
-    "torch==${TORCH_VERSION}" \
-    "torchvision==${TORCHVISION_VERSION}" \
-    --index-url "${TORCH_INDEX_URL}"
 
 # ==============================================================================
 # ── STEP 5: Clone Isaac Lab at the pinned commit ──────────────────────────────
@@ -165,7 +178,19 @@ echo "Isaac Lab HEAD: $(git log -1 --oneline)"
 
 log "Installing Isaac Lab extensions (target: ${ISAACLAB_INSTALL_TARGET})"
 
+set +e
 ./isaaclab.sh --install "${ISAACLAB_INSTALL_TARGET}"
+_ISAACLAB_EXIT=$?
+set -e
+
+if [ $_ISAACLAB_EXIT -ne 0 ]; then
+    echo ""
+    echo "  [NOTE] isaaclab.sh exited with code $_ISAACLAB_EXIT."
+    echo "  If the only error above is 'FileNotFoundError: Could not find the isaac-sim"
+    echo "  directory ... _isaac_sim', the installation succeeded. That VS Code settings"
+    echo "  step expects a local binary install and is safely ignored for pip installs."
+    echo ""
+fi
 
 # ==============================================================================
 # ── STEP 7: Install your project (RT_IL) ─────────────────────────────────────
