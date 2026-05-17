@@ -42,6 +42,8 @@ _build
 
 
 **/assets/unitree_description/
+!**/assets/unitree_description/urdf/g1/main.urdf
+!**/assets/unitree_description/urdf/g1/viz_robot.urdf
 
 artifacts/
 

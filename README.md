@@ -45,6 +45,8 @@ tar -xzf unitree_description.tar.gz -C source/RT_IL/RT_IL/assets/ && \
 rm unitree_description.tar.gz
 ```
 
+> **Note:** `urdf/g1/main.urdf` and `urdf/g1/viz_robot.urdf` are tracked in this repo and will overwrite the downloaded versions. Run `git checkout -- source/RT_IL/RT_IL/assets/unitree_description/urdf/g1/` after extracting the tarball if git doesn't restore them automatically.
+
 ### Install Isaac Lab + RT_IL
 
 Run the installation script from the repo root. It creates a `uv` virtual environment (`env_isaaclab/`), installs Isaac Sim, PyTorch, Isaac Lab (pinned commit), and the RT_IL package in editable mode:
