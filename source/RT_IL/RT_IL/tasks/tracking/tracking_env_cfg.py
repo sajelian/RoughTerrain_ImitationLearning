@@ -441,6 +441,71 @@ class ObservationsCfg_DISTILLATION(ObservationsCfg_TRAIN):
 
 
 @configclass
+class ObservationsCfg_JOYSTICK_DISTILLATION(ObservationsCfg_TRAIN):
+    """Joystick-conditioned student obs for distillation.
+
+    Same teacher group as TRAIN (so existing motion-tracking checkpoints load
+    unchanged). Student group drops `command` and `motion_anchor_ori_b` and
+    replaces them with a joystick-style command derived from the motion clip.
+
+    Stage 0: the student reads the same clean heightmap as the teacher (no
+    deploy-style downsampling or noise on the scanner). This keeps the teacher
+    checkpoint shape-compatible. Sensor-side deploy realism is a Stage 1 concern.
+    """
+
+    @configclass
+    class StudentPolicyCfg(ObsGroup):
+        """Observations for the joystick-conditioned student policy."""
+
+        joystick = ObsTerm(
+            func=mdp.motion_joystick_command,
+            params={
+                "command_name": "motion",
+                "horizon_s": 1.5,
+                "forward_speed": 0.8,
+                "turn_slow": 0.785,
+                "turn_fast": 1.571,
+            },
+            history_length=PROPIO_HISTORY_SHORT,
+        )
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel,
+            scale=0.2,
+            noise=Unoise(n_min=-0.2, n_max=0.2),
+            history_length=PROPIO_HISTORY_LONG,
+        )
+        projected_gravity = ObsTerm(
+            func=mdp.projected_gravity,
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+            history_length=PROPIO_HISTORY_SHORT,
+        )
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            noise=Unoise(n_min=-0.01, n_max=0.01),
+            history_length=PROPIO_HISTORY_LONG,
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            noise=Unoise(n_min=-0.5, n_max=0.5),
+            scale=0.05,
+            history_length=PROPIO_HISTORY_LONG,
+        )
+        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_SHORT)
+        height_scan = ObsTerm(
+            func=mdp.height_scan,
+            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+            clip=(-1.0, 1.0),
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+
+    student: StudentPolicyCfg = StudentPolicyCfg()
+
+
+@configclass
 class EventCfg:
     """Configuration for events."""
 

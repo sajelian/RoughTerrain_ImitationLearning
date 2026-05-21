@@ -153,6 +153,16 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_entropy"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["sampling_top1_prob"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["sampling_top1_bin"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["joystick_vx_error"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["joystick_wz_error"] = torch.zeros(self.num_envs, device=self.device)
+
+        # Cache for joystick metric computation
+        control_dt = env.cfg.decimation * env.cfg.sim.dt
+        self._joystick_H = max(1, int(1.5 / control_dt))
+        self._joystick_control_dt = control_dt
+        self._joystick_anchor_idx = int(
+            self.motion._body_indexes[self.motion_anchor_body_index].item()
+        )
 
     @property
     def command(self) -> torch.Tensor:
@@ -275,6 +285,27 @@ class MotionCommand(CommandTerm):
 
         self.metrics["error_joint_pos"] = torch.norm(self.joint_pos - self.robot_joint_pos, dim=-1)
         self.metrics["error_joint_vel"] = torch.norm(self.joint_vel - self.robot_joint_vel, dim=-1)
+
+        # Joystick tracking: compare motion-derived forward velocity / yaw rate to actual
+        T = self.motion.time_step_total
+        future_t = (self.time_steps + self._joystick_H).clamp(max=T - 1)
+        actual_dt = (future_t - self.time_steps).float() * self._joystick_control_dt
+        a = self._joystick_anchor_idx
+        pos_now = self.motion._body_pos_w[self.time_steps, a]
+        pos_fut = self.motion._body_pos_w[future_t, a]
+        avg_vel_w = (pos_fut - pos_now) / actual_dt.clamp(min=1e-6).unsqueeze(-1)
+        heading_quat = yaw_quat(self.robot_anchor_quat_w)
+        vx_cmd = quat_apply(quat_inv(heading_quat), avg_vel_w)[:, 0]
+        vx_actual = quat_apply(quat_inv(heading_quat), self.robot.data.root_lin_vel_w)[:, 0]
+        q_now = self.motion._body_quat_w[self.time_steps, a]
+        q_fut = self.motion._body_quat_w[future_t, a]
+        yaw_now = torch.atan2(2.0*(q_now[:,0]*q_now[:,3]+q_now[:,1]*q_now[:,2]), 1.0-2.0*(q_now[:,2]**2+q_now[:,3]**2))
+        yaw_fut = torch.atan2(2.0*(q_fut[:,0]*q_fut[:,3]+q_fut[:,1]*q_fut[:,2]), 1.0-2.0*(q_fut[:,2]**2+q_fut[:,3]**2))
+        wz_cmd = (yaw_fut - yaw_now + torch.pi) % (2 * torch.pi) - torch.pi
+        wz_cmd = wz_cmd / actual_dt.clamp(min=1e-6)
+        wz_actual = self.robot.data.root_ang_vel_w[:, 2]
+        self.metrics["joystick_vx_error"] = (vx_cmd - vx_actual).abs()
+        self.metrics["joystick_wz_error"] = (wz_cmd - wz_actual).abs()
 
     def _adaptive_sampling(self, env_ids: Sequence[int]):
         episode_failed = self._env.termination_manager.terminated[env_ids]

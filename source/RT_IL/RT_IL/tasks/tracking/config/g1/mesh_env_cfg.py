@@ -2,12 +2,18 @@ import torch
 
 from RT_IL.mbrl.sensors import NoisedMultiMeshRayCasterCfg
 from isaaclab.managers.scene_entity_cfg import SceneEntityCfg
-from isaaclab.sensors.ray_caster.patterns import patterns
+from isaaclab.sensors.ray_caster import patterns
 from isaaclab.utils import configclass
 from isaaclab.managers import EventTermCfg as EventTerm
+from isaaclab.managers import ObservationTermCfg as ObsTerm
 
 from RT_IL.robots.g1 import G1_CYLINDER_CFG, G1_FOOT_LINKS, G1_HYBRID_ACTION_SCALE, G1_VIZ_CFG
-from RT_IL.tasks.tracking.tracking_env_cfg import ObservationsCfg_DISTILLATION, ObservationsCfg_DEPLOY, TrackingEnvCfg
+from RT_IL.tasks.tracking.tracking_env_cfg import (
+    ObservationsCfg_DEPLOY,
+    ObservationsCfg_DISTILLATION,
+    ObservationsCfg_JOYSTICK_DISTILLATION,
+    TrackingEnvCfg,
+)
 from isaaclab.sensors.ray_caster import RayCasterCfg, MultiMeshRayCasterCfg
 
 
@@ -53,7 +59,7 @@ class FixedStartMotionCommand(MotionCommand):
     def _adaptive_sampling(self, env_ids):
         if len(env_ids) == 0:
             return
-        self.time_steps[env_ids] = 0
+        self.time_steps[env_ids] = 10
 
 
 @configclass
@@ -264,3 +270,41 @@ class G1MeshEnvCfg_DISTILLATIONPLAY(G1MeshEnvCfg_DISTILLATION):
         self.terminations.ee_feet_pos = None
         self.terminations.ee_hand_pos = None
         self.events.push_robot = None
+
+
+@configclass
+class G1MeshEnvCfg_JOYSTICK_DISTILLATION(G1MeshEnvCfg):
+    """Distillation env where the student observes a joystick command instead of
+    the motion-tracking command. Teacher observations (and motion-tracking
+    rewards/terminations) are unchanged.
+
+    Inherits directly from G1MeshEnvCfg (not the existing DISTILLATION variant)
+    so the teacher's height scanner matches its training-time shape (1.2x0.6 @
+    0.05 -> 25x13 = 325 cells). The student reads the same scanner.
+    """
+
+    observations: ObservationsCfg_JOYSTICK_DISTILLATION = ObservationsCfg_JOYSTICK_DISTILLATION()
+
+
+@configclass
+class G1MeshEnvCfg_JOYSTICK_DISTILLATIONPLAY(G1MeshEnvCfg_JOYSTICK_DISTILLATION):
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        _configure_play_viewer(self)
+        self.commands.motion.debug_vis = False
+        self.commands.motion.start_xy_noise_std = 0.0
+        self.terminations.anchor_pos = None
+        # self.terminations.anchor_ori = None
+        self.terminations.ee_feet_pos = None
+        self.terminations.ee_hand_pos = None
+        self.events.push_robot = None
+
+        # Replace motion-derived joystick with live keyboard — same discrete command
+        # space as training (low_speed/high_speed/turn_omega must match ObsTerm above).
+        self.observations.student.joystick = ObsTerm(
+            func=mdp.keyboard_joystick_command,
+            params={"forward_speed": 0.8, "turn_slow": 0.785, "turn_fast": 1.571},
+            history_length=self.observations.student.joystick.history_length,
+        )

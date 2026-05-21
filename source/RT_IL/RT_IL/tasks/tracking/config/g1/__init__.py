@@ -47,6 +47,26 @@ gym.register(
 )
 
 gym.register(
+    id="Tracking-Mesh-G1-Joystick-Distillation-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.mesh_env_cfg:G1MeshEnvCfg_JOYSTICK_DISTILLATION",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_distillation_cfg:G1MimicMeshDistillationRunnerCfg",
+    },
+)
+
+gym.register(
+    id="Tracking-Mesh-G1-Joystick-Distillation-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.mesh_env_cfg:G1MeshEnvCfg_JOYSTICK_DISTILLATIONPLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_distillation_cfg:G1MimicMeshDistillationRunnerCfg",
+    },
+)
+
+gym.register(
     id="Tracking-Mesh-Deploy-G1-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
