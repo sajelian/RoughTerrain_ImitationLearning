@@ -2,7 +2,7 @@ import torch
 
 from RT_IL.mbrl.sensors import NoisedMultiMeshRayCasterCfg
 from isaaclab.managers.scene_entity_cfg import SceneEntityCfg
-from isaaclab.sensors.ray_caster.patterns import patterns
+from isaaclab.sensors.ray_caster import patterns
 from isaaclab.utils import configclass
 from isaaclab.managers import EventTermCfg as EventTerm
 
