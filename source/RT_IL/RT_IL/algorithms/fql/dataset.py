@@ -38,6 +38,7 @@ class FQLReplayBuffer:
         device: str | torch.device = "cuda",
         normalize_obs: bool = True,
         obs_clip: float = 5.0,
+        action_clip_pct: float = 0.5,
         chunk: int = 250_000,
         stat_samples: int = 1_000_000,
     ):
@@ -87,9 +88,31 @@ class FQLReplayBuffer:
         self.device = torch.device(device)
         self.obs_clip = float(obs_clip)
 
-        # Normalization stats from a random subset (fast, statistically ample).
-        n_stat = min(self.n, stat_samples)
-        si = torch.randint(0, self.n, (n_stat,))
+        # --- Clip the action tail per joint ---
+        # Expert clips contain rare reactive transients (RSI settling, contact
+        # impacts) up to ~25 sigma. They are not reproducible skill actions and
+        # poison both normalization and the flow fit. Clip per-joint at the
+        # [action_clip_pct, 100-action_clip_pct] percentiles before computing
+        # any stats. Genuine sustained pushes live in the bulk and survive.
+        si = torch.randint(0, self.n, (min(self.n, stat_samples),))
+        self.action_clip_pct = float(action_clip_pct)
+        if action_clip_pct > 0.0:
+            qs = self.actions[si].float()
+            lo_q = torch.quantile(qs, action_clip_pct / 100.0, dim=0)
+            hi_q = torch.quantile(qs, 1.0 - action_clip_pct / 100.0, dim=0)
+            del qs
+            n_clipped = ((self.actions.float() < lo_q) | (self.actions.float() > hi_q)).any(dim=-1).sum()
+            self.actions = torch.minimum(torch.maximum(self.actions, lo_q.half()), hi_q.half())
+            self.action_clip_lo = lo_q
+            self.action_clip_hi = hi_q
+            print(f"[FQL] Action tail clipped at [{action_clip_pct}%, {100-action_clip_pct}%] per joint: "
+                  f"{n_clipped.item():,} / {self.n:,} transitions touched "
+                  f"({100*n_clipped.item()/self.n:.2f}%)")
+        else:
+            self.action_clip_lo = None
+            self.action_clip_hi = None
+
+        # Normalization stats reuse the subset indices `si` drawn above.
         if normalize_obs:
             obs_sample = self.observations[si].float()
             self.obs_mean = obs_sample.mean(dim=0)
