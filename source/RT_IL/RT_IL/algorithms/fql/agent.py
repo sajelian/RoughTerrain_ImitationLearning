@@ -45,8 +45,14 @@ class FQLConfig:
 
     # One-step distillation (paper Eq. 9: L_π = -Q + alpha * ||μ_ω - μ_θ||²)
     flow_integration_steps: int = 10        # Euler steps when generating BC targets
-    alpha: float = 100.0                    # BC coefficient (paper's single major knob)
-    q_weight_normalize: bool = False        # off by default to match paper; on = scale-invariant
+    alpha: float = 3.0                      # BC coefficient — paper's recommended range
+                                            # with Q normalization: {0.03, 0.1, 0.3, 1, 3, 10}
+    q_weight_normalize: bool = True         # paper *recommends* this for new tasks (App. B)
+
+    # Double-Q aggregation. Paper: mean by default; min for adroit / antmaze-{large,giant}.
+    # box_up (humanoid + manipulation) is closer to the default → "mean".
+    q_aggregator: str = "mean"              # "mean" or "min"
+    layer_norm_q: bool = True               # paper applies LN to value nets
 
     # Stability
     target_q_clip: float | None = None      # optional clip on Q target (None = off)
@@ -69,9 +75,11 @@ class FQLAgent:
             hidden_dims=list(cfg.onestep_hidden_dims), activation=cfg.activation,
         ).to(d)
         self.q1 = QNetwork(obs_dim=cfg.obs_dim, action_dim=cfg.action_dim,
-                           hidden_dims=list(cfg.q_hidden_dims), activation=cfg.activation).to(d)
+                           hidden_dims=list(cfg.q_hidden_dims), activation=cfg.activation,
+                           layer_norm=cfg.layer_norm_q).to(d)
         self.q2 = QNetwork(obs_dim=cfg.obs_dim, action_dim=cfg.action_dim,
-                           hidden_dims=list(cfg.q_hidden_dims), activation=cfg.activation).to(d)
+                           hidden_dims=list(cfg.q_hidden_dims), activation=cfg.activation,
+                           layer_norm=cfg.layer_norm_q).to(d)
         self.q1_target = copy.deepcopy(self.q1).requires_grad_(False)
         self.q2_target = copy.deepcopy(self.q2).requires_grad_(False)
 
@@ -99,6 +107,12 @@ class FQLAgent:
         v_pred = self.flow(a_t, t.squeeze(-1), s)
         return F.mse_loss(v_pred, a - z)
 
+    def _agg(self, q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
+        """Aggregate the double-Q values. Paper default: mean; 'min' for harder tasks."""
+        if self.cfg.q_aggregator == "min":
+            return torch.min(q1, q2)
+        return 0.5 * (q1 + q2)
+
     def q_loss(self, batch: FQLBatch) -> tuple[torch.Tensor, dict]:
         s, a, r, s_next, d = batch.obs, batch.action, batch.reward, batch.next_obs, batch.done
         with torch.no_grad():
@@ -106,7 +120,7 @@ class FQLAgent:
             a_next = self.onestep(s_next, z_next)
             q1_next = self.q1_target(s_next, a_next)
             q2_next = self.q2_target(s_next, a_next)
-            q_next = torch.min(q1_next, q2_next)
+            q_next = self._agg(q1_next, q2_next)
             target = r + self.cfg.gamma * (1.0 - d) * q_next
             if self.cfg.target_q_clip is not None:
                 target = target.clamp(-self.cfg.target_q_clip, self.cfg.target_q_clip)
@@ -137,14 +151,13 @@ class FQLAgent:
         a_phi = self.onestep(s, z)
         bc = F.mse_loss(a_phi, a_target)
 
-        # Q-improvement signal (gradient flows through a_phi)
-        q_phi = self.q1(s, a_phi)
+        # Q-improvement signal (gradient flows through a_phi). Paper Eq. 9 uses
+        # mean(Q1, Q2) for the actor objective (App. B, "Value learning").
+        q_phi = self._agg(self.q1(s, a_phi), self.q2(s, a_phi))
         if self.cfg.q_weight_normalize:
-            # Optional scale-invariant Q weighting (TD3+BC trick); off by default to match paper.
-            adv_abs = q_phi.detach().abs().mean().item()
-            self._adv_abs_ema = 0.99 * self._adv_abs_ema + 0.01 * adv_abs
-            q_norm = max(self._adv_abs_ema, 1e-6)
-            policy_loss = -q_phi.mean() / q_norm
+            # Paper Appendix B: lam = stop_grad(1 / mean(|q|)).  Batch-wise, not EMA.
+            lam = (1.0 / q_phi.detach().abs().mean().clamp(min=1e-6))
+            policy_loss = -lam * q_phi.mean()
         else:
             policy_loss = -q_phi.mean()
 
@@ -152,7 +165,6 @@ class FQLAgent:
         return loss, {
             "bc_loss": bc.item(),
             "policy_q": q_phi.mean().item(),
-            "adv_abs_ema": self._adv_abs_ema,
         }
 
     # --- update step ---

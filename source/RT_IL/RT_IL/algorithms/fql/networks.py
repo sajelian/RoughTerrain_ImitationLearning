@@ -98,18 +98,28 @@ class OneStepFlowPolicy(nn.Module):
 
 
 class QNetwork(nn.Module):
-    """Standard Q(s, a) MLP. Used as a clipped-double-Q pair in FQLAgent."""
+    """Q(s, a) MLP with optional layer normalization (paper-recommended for stability)."""
 
     def __init__(
         self,
         obs_dim: int,
         action_dim: int,
-        hidden_dims: list[int] = (512, 512, 512),
-        activation: str = "elu",
+        hidden_dims: list[int] = (512, 512, 512, 512),
+        activation: str = "gelu",
+        layer_norm: bool = True,
     ):
         super().__init__()
-        dims = [obs_dim + action_dim, *hidden_dims, 1]
-        self.net = _mlp(dims, activation=activation)
+        act_cls = {"elu": nn.ELU, "relu": nn.ReLU, "silu": nn.SiLU, "gelu": nn.GELU}[activation.lower()]
+        layers: list[nn.Module] = []
+        in_d = obs_dim + action_dim
+        for h in hidden_dims:
+            layers.append(nn.Linear(in_d, h))
+            if layer_norm:
+                layers.append(nn.LayerNorm(h))
+            layers.append(act_cls())
+            in_d = h
+        layers.append(nn.Linear(in_d, 1))
+        self.net = nn.Sequential(*layers)
 
     def forward(self, obs: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         return self.net(torch.cat([obs, action], dim=-1)).squeeze(-1)
