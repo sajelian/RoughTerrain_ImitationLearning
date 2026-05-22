@@ -182,14 +182,14 @@ def motion_joystick_command(
     forward_speed: float = 0.8,
     turn_slow: float = 0.785,   # π/4 rad/s ≈ 45°/s
     turn_fast: float = 1.571,   # π/2 rad/s ≈ 90°/s
-    speed_ema_tau_s: float = 1.0,
+    speed_ema_tau_s: float = 0.3,
 ) -> torch.Tensor:
     """Discrete joystick command (vx, vy=0, omega_yaw) derived from the motion reference.
 
     Average velocity is (pos[t+H] - pos[t]) / H — temporal integral cancels gait
     oscillation. Planar speed norm is smoothed with an exponential moving average
-    (tau=1s) before thresholding so brief torso stillness mid-skill (e.g. leg
-    repositioning during box_up) does not create a spurious stop label.
+    (tau=0.3s) before thresholding. 0.3s is short enough to preserve genuine stop
+    phases (1+ seconds) while bridging sub-frame hiccups (<0.2s).
     Quantised to {0, forward_speed} × {±turn_fast, ±turn_slow, 0}.
     Returns shape (num_envs, 3).
     """
@@ -226,10 +226,9 @@ def motion_joystick_command(
     lin_vel_h = quat_apply_inverse(heading_quat, avg_vel_w)
     speed = (lin_vel_h[:, 0] ** 2 + lin_vel_h[:, 1] ** 2).sqrt()
 
-    # EMA smoothing: bridges brief torso stillness within a skill
+    # EMA smoothing: bridges brief torso stillness within a skill.
+    # _joystick_speed_ema is owned and reset by MotionCommand (initialized to 0 on episode reset).
     alpha = float(torch.exp(torch.tensor(-control_dt / speed_ema_tau_s)).item())
-    if not hasattr(command, '_joystick_speed_ema'):
-        command._joystick_speed_ema = speed.clone()
     command._joystick_speed_ema = alpha * command._joystick_speed_ema + (1.0 - alpha) * speed
 
     return _quantize_joystick(command._joystick_speed_ema, omega_z, forward_speed, turn_slow, turn_fast)

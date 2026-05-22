@@ -107,7 +107,6 @@ class G1MeshEnvCfg(TrackingEnvCfg):
         ]
 
         self.scene.obstacle = self.obstacle
-        # self.commands.motion.class_type = FixedStartMotionCommand
 
 
 @configclass

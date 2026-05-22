@@ -131,7 +131,7 @@ def main():
     forward_speed = 0.8
     turn_slow = 0.785   # pi/4
     turn_fast = 1.571   # pi/2
-    speed_ema_tau_s = 1.0
+    speed_ema_tau_s = 0.3
 
     joystick = compute_joystick(body_pos_w, body_quat_w, fps, K)
     instantaneous = compute_instantaneous(body_quat_w, body_lin_vel_w, body_ang_vel_w)
