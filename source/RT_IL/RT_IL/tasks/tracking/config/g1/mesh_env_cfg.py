@@ -136,7 +136,7 @@ class G1MeshEnvDeployCfg(G1MeshEnvCfg):
         super().__post_init__()
 
         self.scene.height_scanner = _noised_mesh_scanner(
-            resolution=0.05, size=[0.5, 0.8]  # flipped dimension for sideways beam
+            resolution=0.05, size=[1.2, 0.6], pos=(0.4, 0.0, 20.0)
         )
 
         DEPLOY_PUSH_VELOCITY_RANGE = {
