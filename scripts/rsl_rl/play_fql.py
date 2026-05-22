@@ -108,6 +108,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
     obs_clip = float(normalizer["obs_clip"])
     obs_dim = int(normalizer["obs_dim"])
     action_dim = int(normalizer["action_dim"])
+    # Action normalizer (policy operates in standardized action space).
+    if "action_mean" not in normalizer:
+        raise KeyError(
+            "normalizer.pt has no action_mean/action_std — it was produced by an "
+            "older train_fql.py. Retrain with the current version."
+        )
+    action_mean = normalizer["action_mean"].to(device)
+    action_std = normalizer["action_std"].to(device)
 
     # Recreate the agent. The saved 'config' dict in the checkpoint preserves the exact
     # network sizes so we don't have to guess.
@@ -139,9 +147,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
     def act(student_obs: torch.Tensor) -> torch.Tensor:
         obs_n = normalize_obs(student_obs)
         if args_cli.use_flow:
-            return agent.act_flow(obs_n, num_steps=args_cli.flow_steps)
+            action_n = agent.act_flow(obs_n, num_steps=args_cli.flow_steps)
         else:
-            return agent.act(obs_n, deterministic_z=args_cli.deterministic_z)
+            action_n = agent.act(obs_n, deterministic_z=args_cli.deterministic_z)
+        # Policy operates in standardized action space — map back to raw env units.
+        return action_n * action_std + action_mean
 
     # --- Run loop ---
     obs = env.get_observations()

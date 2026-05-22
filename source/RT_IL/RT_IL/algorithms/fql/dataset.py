@@ -1,8 +1,17 @@
 """Replay buffer for FQL offline training.
 
 Loads one or more (s, a, r, s', done) .pt files produced by
-`scripts/rsl_rl/collect_fql_dataset.py`, optionally standardizes observations,
-and serves random minibatches.
+`scripts/rsl_rl/collect_fql_dataset.py` and serves random minibatches.
+
+Strategy: source files are memory-mapped (zero RAM at open), then copied
+chunk-by-chunk into RAM-resident float16 tensors. float16 halves the footprint
+(obs are normalized NN inputs — 3 decimal digits is plenty) and the chunked
+copy keeps peak memory at `final_size + one_chunk` rather than `2 x file_size`.
+Sampling then indexes RAM tensors directly (microseconds, no disk).
+
+Footprint: ~obs_dim * 4 bytes/transition  (obs + next_obs in fp16).
+e.g. 4M transitions @ obs_dim=988 -> ~16 GB RAM.  For datasets too large for
+RAM, pass `keep_on_disk=True` to sample straight from the mmap (slower).
 """
 
 from __future__ import annotations
@@ -15,86 +24,106 @@ import torch
 
 @dataclass
 class FQLBatch:
-    obs: torch.Tensor          # (B, obs_dim) normalized
-    action: torch.Tensor       # (B, action_dim)
-    reward: torch.Tensor       # (B,)
-    next_obs: torch.Tensor     # (B, obs_dim) normalized
-    done: torch.Tensor         # (B,) float (0/1)
+    obs: torch.Tensor          # (B, obs_dim) normalized float32
+    action: torch.Tensor       # (B, action_dim) float32
+    reward: torch.Tensor       # (B,) float32
+    next_obs: torch.Tensor     # (B, obs_dim) normalized float32
+    done: torch.Tensor         # (B,) float32 (0/1)
 
 
 class FQLReplayBuffer:
-    """Aggregates rollout files into a single in-memory replay buffer.
-
-    Storage stays on CPU (pinned). Each `sample()` call ships a minibatch to the
-    target device. Suitable for datasets up to ~32 GB of CPU RAM; for larger
-    datasets switch to memory-mapped tensors or HDF5.
-    """
-
     def __init__(
         self,
         paths: str | list[str],
         device: str | torch.device = "cuda",
         normalize_obs: bool = True,
         obs_clip: float = 5.0,
+        chunk: int = 250_000,
+        stat_samples: int = 1_000_000,
     ):
         if isinstance(paths, str):
             paths = [paths]
         if not paths:
             raise ValueError("FQLReplayBuffer needs at least one rollout file.")
 
-        obs_chunks, act_chunks, rew_chunks, next_obs_chunks, done_chunks = [], [], [], [], []
-        action_dim = obs_dim = None
+        # First pass: mmap each file, sum sizes, validate dims.
+        mmaps: list[dict] = []
+        sizes: list[int] = []
         for p in paths:
             assert os.path.isfile(p), f"Rollout file not found: {p}"
-            data = torch.load(p, weights_only=False, map_location="cpu")
-            obs_chunks.append(data["observations"])
-            act_chunks.append(data["actions"])
-            rew_chunks.append(data["rewards"])
-            next_obs_chunks.append(data["next_observations"])
-            done_chunks.append(data["dones"])
-            md = data.get("metadata", {})
-            if obs_dim is None:
-                obs_dim = md.get("student_obs_dim", obs_chunks[0].shape[-1])
-                action_dim = md.get("action_dim", act_chunks[0].shape[-1])
-            else:
-                if md.get("student_obs_dim", obs_chunks[-1].shape[-1]) != obs_dim:
-                    raise ValueError(f"obs_dim mismatch across files at {p}")
-                if md.get("action_dim", act_chunks[-1].shape[-1]) != action_dim:
-                    raise ValueError(f"action_dim mismatch across files at {p}")
+            data = torch.load(p, weights_only=False, map_location="cpu", mmap=True)
+            mmaps.append(data)
+            sizes.append(int(data["observations"].shape[0]))
+        self.obs_dim = int(mmaps[0]["observations"].shape[-1])
+        self.action_dim = int(mmaps[0]["actions"].shape[-1])
+        for fi, data in enumerate(mmaps):
+            if data["observations"].shape[-1] != self.obs_dim:
+                raise ValueError(f"obs_dim mismatch in {paths[fi]}")
+            if data["actions"].shape[-1] != self.action_dim:
+                raise ValueError(f"action_dim mismatch in {paths[fi]}")
+        self.n = sum(sizes)
 
-        self.observations = torch.cat(obs_chunks, dim=0)
-        self.actions = torch.cat(act_chunks, dim=0)
-        self.rewards = torch.cat(rew_chunks, dim=0).float()
-        self.next_observations = torch.cat(next_obs_chunks, dim=0)
-        self.dones = torch.cat(done_chunks, dim=0).float()
-        self.obs_dim = self.observations.shape[-1]
-        self.action_dim = self.actions.shape[-1]
-        self.n = self.observations.shape[0]
+        # Preallocate RAM-resident tensors (fp16 for the big ones).
+        self.observations = torch.empty((self.n, self.obs_dim), dtype=torch.float16)
+        self.next_observations = torch.empty((self.n, self.obs_dim), dtype=torch.float16)
+        self.actions = torch.empty((self.n, self.action_dim), dtype=torch.float16)
+        self.rewards = torch.empty((self.n,), dtype=torch.float32)
+        self.dones = torch.empty((self.n,), dtype=torch.float32)
+
+        # Chunked copy mmap -> RAM (bounds peak memory to one chunk of fp32).
+        write = 0
+        for data, sz in zip(mmaps, sizes):
+            for lo in range(0, sz, chunk):
+                hi = min(lo + chunk, sz)
+                dst = slice(write + lo, write + hi)
+                self.observations[dst] = data["observations"][lo:hi].half()
+                self.next_observations[dst] = data["next_observations"][lo:hi].half()
+                self.actions[dst] = data["actions"][lo:hi].half()
+                self.rewards[dst] = data["rewards"][lo:hi].float()
+                self.dones[dst] = data["dones"][lo:hi].float()
+            write += sz
+        del mmaps  # release the memory maps
 
         self.device = torch.device(device)
         self.obs_clip = float(obs_clip)
 
+        # Normalization stats from a random subset (fast, statistically ample).
+        n_stat = min(self.n, stat_samples)
+        si = torch.randint(0, self.n, (n_stat,))
         if normalize_obs:
-            self.obs_mean = self.observations.mean(dim=0)
-            self.obs_std = self.observations.std(dim=0).clamp(min=1e-3)
+            obs_sample = self.observations[si].float()
+            self.obs_mean = obs_sample.mean(dim=0)
+            self.obs_std = obs_sample.std(dim=0).clamp(min=1e-3)
+            del obs_sample
         else:
             self.obs_mean = torch.zeros(self.obs_dim)
             self.obs_std = torch.ones(self.obs_dim)
-        # Move stats to target device once.
         self.obs_mean_dev = self.obs_mean.to(self.device)
         self.obs_std_dev = self.obs_std.to(self.device)
 
-        # Reward stats (just for logging; not applied automatically).
-        self.reward_mean = float(self.rewards.mean().item())
-        self.reward_std = float(self.rewards.std().item())
+        # Action normalization is NOT optional — flow matching assumes actions on
+        # a scale comparable to the z~N(0,I) prior. Raw joint actions are O(±8).
+        act_sample = self.actions[si].float()
+        self.action_mean = act_sample.mean(dim=0)
+        self.action_std = act_sample.std(dim=0).clamp(min=1e-3)
+        del act_sample
+        self.action_mean_dev = self.action_mean.to(self.device)
+        self.action_std_dev = self.action_std.to(self.device)
 
-        print(f"[FQL] Loaded {self.n:,} transitions from {len(paths)} file(s). "
-              f"obs={self.obs_dim} action={self.action_dim}")
+        self.reward_mean = float(self.rewards.mean())
+        self.reward_std = float(self.rewards.std())
+        done_rate = float(self.dones.mean())
+
+        gb = (self.observations.element_size() * self.observations.nelement() * 2
+              + self.actions.element_size() * self.actions.nelement()) / 1e9
+        print(f"[FQL] Loaded {self.n:,} transitions from {len(paths)} file(s) into RAM (fp16). "
+              f"obs={self.obs_dim} action={self.action_dim}  (~{gb:.1f} GB RAM)")
         print(f"      obs:    mean=[{self.obs_mean.min().item():+.2f}, {self.obs_mean.max().item():+.2f}]  "
               f"std=[{self.obs_std.min().item():.2f}, {self.obs_std.max().item():.2f}]")
+        print(f"      action: mean=[{self.action_mean.min().item():+.2f}, {self.action_mean.max().item():+.2f}]  "
+              f"std=[{self.action_std.min().item():.2f}, {self.action_std.max().item():.2f}]  (standardized)")
         print(f"      reward: mean={self.reward_mean:+.4f}  std={self.reward_std:.4f}  "
-              f"min={self.rewards.min().item():+.4f}  max={self.rewards.max().item():+.4f}")
-        print(f"      done_rate={self.dones.mean().item():.4f}")
+              f"done_rate={done_rate:.4f}")
 
     def normalize_obs(self, obs: torch.Tensor) -> torch.Tensor:
         return ((obs - self.obs_mean_dev) / self.obs_std_dev).clamp(-self.obs_clip, self.obs_clip)
@@ -102,17 +131,23 @@ class FQLReplayBuffer:
     def denormalize_obs(self, obs_n: torch.Tensor) -> torch.Tensor:
         return obs_n * self.obs_std_dev + self.obs_mean_dev
 
+    def normalize_action(self, action: torch.Tensor) -> torch.Tensor:
+        return (action - self.action_mean_dev) / self.action_std_dev
+
+    def denormalize_action(self, action_n: torch.Tensor) -> torch.Tensor:
+        """Map a policy output in standardized space back to raw env action units."""
+        return action_n * self.action_std_dev + self.action_mean_dev
+
     def sample(self, batch_size: int) -> FQLBatch:
         idx = torch.randint(0, self.n, (batch_size,))
-        # Pull raw tensors on CPU, then ship to device.
-        obs = self.observations[idx].to(self.device, non_blocking=True)
-        act = self.actions[idx].to(self.device, non_blocking=True)
+        obs = self.observations[idx].to(self.device, non_blocking=True).float()
+        act = self.actions[idx].to(self.device, non_blocking=True).float()
         rew = self.rewards[idx].to(self.device, non_blocking=True)
-        next_obs = self.next_observations[idx].to(self.device, non_blocking=True)
+        next_obs = self.next_observations[idx].to(self.device, non_blocking=True).float()
         done = self.dones[idx].to(self.device, non_blocking=True)
         return FQLBatch(
             obs=self.normalize_obs(obs),
-            action=act,
+            action=self.normalize_action(act),
             reward=rew,
             next_obs=self.normalize_obs(next_obs),
             done=done,

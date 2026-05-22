@@ -99,13 +99,15 @@ def main():
         wandb.init(project=args.wandb_project, name=args.wandb_name,
                    config={**vars(args), "obs_dim": buf.obs_dim, "action_dim": buf.action_dim})
 
-    # --- save obs normalizer (needed at deploy time) ---
+    # --- save obs + action normalizer (needed at deploy time) ---
     torch.save({
         "obs_mean": buf.obs_mean,
         "obs_std": buf.obs_std,
         "obs_clip": buf.obs_clip,
         "obs_dim": buf.obs_dim,
         "action_dim": buf.action_dim,
+        "action_mean": buf.action_mean,
+        "action_std": buf.action_std,
     }, os.path.join(args.output_dir, "normalizer.pt"))
 
     # --- train ---
