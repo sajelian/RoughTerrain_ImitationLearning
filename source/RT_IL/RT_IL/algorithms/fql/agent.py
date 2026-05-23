@@ -26,10 +26,13 @@ class FQLConfig:
     obs_dim: int
     action_dim: int
 
-    # Network sizes (paper Table 5: [512,512,512,512] + GELU)
-    flow_hidden_dims: tuple[int, ...] = (512, 512, 512, 512)
-    onestep_hidden_dims: tuple[int, ...] = (512, 512, 512, 512)
-    q_hidden_dims: tuple[int, ...] = (512, 512, 512, 512)
+    # Network sizes. Paper used [512]×4 for ~30-70 dim obs (a 7-17x expansion at
+    # layer 1). Our G1 student obs is ~988 dim → [512]×4 is actually a 2x
+    # *compression* at layer 1, throwing away obs information.  Start wider to
+    # match the obs scale, matching the BC student's first-layer width of 1024.
+    flow_hidden_dims: tuple[int, ...] = (1024, 1024, 512, 512)
+    onestep_hidden_dims: tuple[int, ...] = (1024, 1024, 512, 512)
+    q_hidden_dims: tuple[int, ...] = (1024, 1024, 512, 512)
     activation: str = "gelu"
     time_embed_dim: int = 64
 

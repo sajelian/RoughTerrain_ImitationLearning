@@ -54,9 +54,11 @@ def parse_args():
                         "dexterous=3000-30000. Sweep {30, 100, 300} for new tasks.")
     p.add_argument("--q_normalize", action="store_true",
                    help="(Non-paper) enable EMA-based Q normalization. Off by default.")
-    p.add_argument("--flow_hidden", type=int, nargs="+", default=[512, 512, 512, 512])
-    p.add_argument("--onestep_hidden", type=int, nargs="+", default=[512, 512, 512, 512])
-    p.add_argument("--q_hidden", type=int, nargs="+", default=[512, 512, 512, 512])
+    p.add_argument("--flow_hidden", type=int, nargs="+", default=[1024, 1024, 512, 512],
+                   help="Wider than paper default ([512]×4) because our student obs is ~988-dim "
+                        "(a bottleneck at layer-1=512 instead of expansion).")
+    p.add_argument("--onestep_hidden", type=int, nargs="+", default=[1024, 1024, 512, 512])
+    p.add_argument("--q_hidden", type=int, nargs="+", default=[1024, 1024, 512, 512])
     p.add_argument("--activation", type=str, default="gelu", choices=["gelu", "elu", "silu", "relu"])
 
     p.add_argument("--device", type=str, default="cuda")
