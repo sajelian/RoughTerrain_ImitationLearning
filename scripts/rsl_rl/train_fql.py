@@ -39,6 +39,12 @@ def parse_args():
                    help="Per-joint percentile to clip the action tail at "
                         "([pct, 100-pct]). Removes rare reactive transients that "
                         "poison the flow fit. 0 = no clipping.")
+    p.add_argument("--reward_key", type=str, default="rewards_cmd",
+                   choices=["rewards", "rewards_cmd"],
+                   help="Which reward field to optimize. 'rewards'=motion tracking "
+                        "(teacher's env reward, depends on hidden motion command). "
+                        "'rewards_cmd'=command velocity tracking (depends only on "
+                        "joystick + robot velocity; aligned with deploy objective).")
 
     # algorithm hyperparams (override defaults in FQLConfig)
     p.add_argument("--gamma", type=float, default=0.99,
@@ -77,7 +83,7 @@ def main():
 
     # --- data ---
     buf = FQLReplayBuffer(paths=args.datasets, device=args.device, normalize_obs=True,
-                          action_clip_pct=args.action_clip_pct)
+                          action_clip_pct=args.action_clip_pct, reward_key=args.reward_key)
 
     # --- agent ---
     cfg = FQLConfig(

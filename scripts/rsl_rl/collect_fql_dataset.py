@@ -150,6 +150,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
         env = multi_agent_to_single_agent(env)
     env = RslRlVecEnvWrapper(env)
 
+    # Robot handle for body-frame velocity (used by the command-tracking reward).
+    robot = env.unwrapped.scene["robot"]
+    from isaaclab.utils.math import yaw_quat, quat_apply_inverse
+
     # Load teacher checkpoint into an OnPolicyRunner so we get its inference path.
     agent_cfg = handle_deprecated_rsl_rl_cfg(agent_cfg, installed_version)
     runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device)
@@ -188,6 +192,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
     next_obs_buf = torch.empty((capacity, student_dim), dtype=torch.float32, device="cpu")
     action_buf = torch.empty((capacity, action_dim), dtype=torch.float32, device="cpu")
     reward_buf = torch.empty((capacity,), dtype=torch.float32, device="cpu")
+    reward_cmd_buf = torch.empty((capacity,), dtype=torch.float32, device="cpu")
     done_buf = torch.empty((capacity,), dtype=torch.bool, device="cpu")
 
     apply_noise = args_cli.action_noise_std > 0.0
@@ -207,6 +212,20 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
 
             obs, reward, done, _ = env.step(action)
 
+            # ---- Command-tracking reward (computed in next-obs context) ----
+            # The "current" joystick label sits in the first 3 dims of obs["student"]
+            # because joystick is the first ObsTerm in StudentPolicyCfg and IsaacLab
+            # stacks history newest-first.  Robot velocity in the yaw-only heading
+            # frame is the natural frame for forward-speed tracking.
+            yaw_q = yaw_quat(robot.data.root_quat_w)
+            v_h = quat_apply_inverse(yaw_q, robot.data.root_lin_vel_w)
+            vx_robot = v_h[:, 0]
+            wz_robot = robot.data.root_ang_vel_w[:, 2]  # yaw rate is yaw-frame invariant
+            joy = obs["student"][:, 0:3]
+            vx_cmd, wz_cmd = joy[:, 0], joy[:, 2]
+            err = (vx_cmd - vx_robot).square() + (wz_cmd - wz_robot).square()
+            r_cmd = torch.exp(-err / (0.5 ** 2))  # sigma = 0.5
+
             # Store the action that was actually executed so (s, a, r, s') is consistent
             # for Q learning. With action_noise_std=0 this is just the clean expert action.
             sl = slice(write, write + num_envs)
@@ -214,6 +233,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
             next_obs_buf[sl].copy_(obs["student"], non_blocking=True)
             action_buf[sl].copy_(action, non_blocking=True)
             reward_buf[sl].copy_(reward.float(), non_blocking=True)
+            reward_cmd_buf[sl].copy_(r_cmd.float(), non_blocking=True)
             done_buf[sl].copy_(done.bool(), non_blocking=True)
             write += num_envs
 
@@ -221,7 +241,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
                 elapsed = time.time() - t0
                 fps = (step + 1) * num_envs / elapsed
                 print(f"  [{step+1:>5d}/{num_steps}]  {write:,} transitions  "
-                      f"{fps:,.0f} env-steps/s  done_rate={done.float().mean().item():.3f}")
+                      f"{fps:,.0f} env-steps/s  done={done.float().mean().item():.3f}  "
+                      f"r_motion={reward.float().mean().item():+.3f}  "
+                      f"r_cmd={r_cmd.mean().item():.3f}")
 
     env.close()
 
@@ -236,6 +258,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
         "observations": obs_buf,
         "actions": action_buf,
         "rewards": reward_buf,
+        "rewards_cmd": reward_cmd_buf,   # command-velocity tracking reward
         "next_observations": next_obs_buf,
         "dones": done_buf,
         "metadata": {
@@ -248,6 +271,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
             "student_obs_dim": student_dim,
             "action_dim": action_dim,
             "action_noise_std": args_cli.action_noise_std,
+            "reward_cmd_sigma": 0.5,
             "step_dt": float(env.unwrapped.step_dt),
         },
     }, output_path)

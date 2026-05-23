@@ -39,6 +39,7 @@ class FQLReplayBuffer:
         normalize_obs: bool = True,
         obs_clip: float = 5.0,
         action_clip_pct: float = 0.5,
+        reward_key: str = "rewards",
         chunk: int = 250_000,
         stat_samples: int = 1_000_000,
     ):
@@ -71,18 +72,32 @@ class FQLReplayBuffer:
         self.rewards = torch.empty((self.n,), dtype=torch.float32)
         self.dones = torch.empty((self.n,), dtype=torch.float32)
 
+        # Resolve which reward field to load. Fall back to 'rewards' if a file
+        # was collected before reward_cmd existed.
+        actual_reward_keys = []
+        for fi, data in enumerate(mmaps):
+            if reward_key in data:
+                actual_reward_keys.append(reward_key)
+            elif reward_key == "rewards_cmd" and "rewards" in data:
+                actual_reward_keys.append("rewards")
+                print(f"[FQL] WARNING: {paths[fi]} has no 'rewards_cmd' field — falling back to 'rewards'. "
+                      "Re-collect this file with the current collect_fql_dataset.py to use command-tracking reward.")
+            else:
+                actual_reward_keys.append("rewards")
+
         # Chunked copy mmap -> RAM (bounds peak memory to one chunk of fp32).
         write = 0
-        for data, sz in zip(mmaps, sizes):
+        for data, sz, rk in zip(mmaps, sizes, actual_reward_keys):
             for lo in range(0, sz, chunk):
                 hi = min(lo + chunk, sz)
                 dst = slice(write + lo, write + hi)
                 self.observations[dst] = data["observations"][lo:hi].half()
                 self.next_observations[dst] = data["next_observations"][lo:hi].half()
                 self.actions[dst] = data["actions"][lo:hi].half()
-                self.rewards[dst] = data["rewards"][lo:hi].float()
+                self.rewards[dst] = data[rk][lo:hi].float()
                 self.dones[dst] = data["dones"][lo:hi].float()
             write += sz
+        self.reward_key = reward_key
         del mmaps  # release the memory maps
 
         self.device = torch.device(device)
@@ -140,7 +155,8 @@ class FQLReplayBuffer:
         gb = (self.observations.element_size() * self.observations.nelement() * 2
               + self.actions.element_size() * self.actions.nelement()) / 1e9
         print(f"[FQL] Loaded {self.n:,} transitions from {len(paths)} file(s) into RAM (fp16). "
-              f"obs={self.obs_dim} action={self.action_dim}  (~{gb:.1f} GB RAM)")
+              f"obs={self.obs_dim} action={self.action_dim}  reward_key='{self.reward_key}'  "
+              f"(~{gb:.1f} GB RAM)")
         print(f"      obs:    mean=[{self.obs_mean.min().item():+.2f}, {self.obs_mean.max().item():+.2f}]  "
               f"std=[{self.obs_std.min().item():.2f}, {self.obs_std.max().item():.2f}]")
         print(f"      action: mean=[{self.action_mean.min().item():+.2f}, {self.action_mean.max().item():+.2f}]  "
