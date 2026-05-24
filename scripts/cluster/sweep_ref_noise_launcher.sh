@@ -6,7 +6,7 @@ set -e
 SBATCH="scripts/cluster/train.sbatch"
 SCRIPT="scripts/rsl_rl/train_mimic_mesh.py"
 TASK="Tracking-Mesh-G1-v0"
-NUM_ENVS=8192
+NUM_ENVS=16384
 MAX_ITERATIONS=2000
 SEEDS=(2 3 4)
 
