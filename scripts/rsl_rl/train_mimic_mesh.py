@@ -33,6 +33,10 @@ parser.add_argument("--registry_name", type=str, required=True, help="The name o
 parser.add_argument(
     "--usd_name", type=str, default=None, help="Name of the USD mesh."
 )
+parser.add_argument(
+    "--ref_noise", type=float, default=0.0,
+    help="Gaussian σ (metres) added to reference body positions each step (terrain-alignment accuracy ablation).",
+)
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -116,6 +120,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     api = wandb.Api()
     artifact = api.artifact(registry_name)
     env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
+    env_cfg.commands.motion.ref_pos_noise_std = args_cli.ref_noise
 
     env_cfg.scene.obstacle = env_cfg.scene.obstacle.replace(
         spawn=env_cfg.scene.obstacle.spawn.replace(

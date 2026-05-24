@@ -154,6 +154,10 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_top1_prob"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["sampling_top1_bin"] = torch.zeros(self.num_envs, device=self.device)
 
+        # Per-step global offset applied to all reference body positions (terrain-alignment ablation).
+        # Shape (num_envs, 1, 3) broadcasts across all bodies so the whole skeleton shifts coherently.
+        self._ref_body_pos_noise = torch.zeros(self.num_envs, 1, 3, device=self.device)
+
     @property
     def command(self) -> torch.Tensor:
         return torch.cat([self.joint_pos, self.joint_vel], dim=1)
@@ -168,7 +172,7 @@ class MotionCommand(CommandTerm):
 
     @property
     def body_pos_w(self) -> torch.Tensor:
-        return self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :]
+        return self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :] + self._ref_body_pos_noise
 
     @property
     def body_quat_w(self) -> torch.Tensor:
@@ -184,7 +188,11 @@ class MotionCommand(CommandTerm):
 
     @property
     def anchor_pos_w(self) -> torch.Tensor:
-        return self.motion.body_pos_w[self.time_steps, self.motion_anchor_body_index] + self._env.scene.env_origins
+        return (
+            self.motion.body_pos_w[self.time_steps, self.motion_anchor_body_index]
+            + self._env.scene.env_origins
+            + self._ref_body_pos_noise[:, 0]
+        )
 
     @property
     def anchor_quat_w(self) -> torch.Tensor:
@@ -378,6 +386,9 @@ class MotionCommand(CommandTerm):
         env_ids = torch.where(self.time_steps >= self.motion.time_step_total)[0]
         self._resample_command(env_ids)
 
+        if self.cfg.ref_pos_noise_std > 0.0:
+            self._ref_body_pos_noise = torch.randn_like(self._ref_body_pos_noise) * self.cfg.ref_pos_noise_std
+
         anchor_pos_w_repeat = self.anchor_pos_w[:, None, :].repeat(1, len(self.cfg.body_names), 1)
         anchor_quat_w_repeat = self.anchor_quat_w[:, None, :].repeat(1, len(self.cfg.body_names), 1)
         robot_anchor_pos_w_repeat = self.robot_anchor_pos_w[:, None, :].repeat(1, len(self.cfg.body_names), 1)
@@ -468,6 +479,10 @@ class MotionCommandCfg(CommandTermCfg):
     adaptive_alpha: float = 0.001
 
     start_xy_noise_std: float = 0.0
+
+    # Gaussian noise (σ in metres) added every step to reference body positions.
+    # Used for the terrain-alignment accuracy ablation: 0.0 = clean reference.
+    ref_pos_noise_std: float = 0.0
 
     anchor_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/pose")
     anchor_visualizer_cfg.markers["frame"].scale = (0.2, 0.2, 0.2)

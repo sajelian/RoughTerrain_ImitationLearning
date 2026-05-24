@@ -174,7 +174,7 @@ class CommandsCfg:
         },
         velocity_range=RESET_VELOCITY_RANGE,
         joint_position_range=(-0.1, 0.1),
-        start_xy_noise_std=0.1,  # keep this < 0.3 or episode will terminate immediately
+        start_xy_noise_std=0.0,  # keep this < 0.3 or episode will terminate immediately
     )
 
 

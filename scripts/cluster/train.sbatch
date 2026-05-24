@@ -10,7 +10,7 @@
 #SBATCH --mail-user=sajelian@gmx.net
 #SBATCH --job-name="rt-il-train-$(date +"%Y-%m-%dT%H:%M")"
 #SBATCH --exclude=eu-g6-064
-#SBATCH --account=es_hutter
+#SBATCH --account=ls_polle
 
 set -e
 
