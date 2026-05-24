@@ -145,7 +145,7 @@ class ReplayMotionsSceneCfg(InteractiveSceneCfg):
     """Configuration for a replay motions scene."""
 
     # ground plane
-    ground = AssetBaseCfg(prim_path="/World/defaultGroundPlane", spawn=sim_utils.GroundPlaneCfg(), init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, -3.0)))
+    ground = AssetBaseCfg(prim_path="/World/defaultGroundPlane", spawn=sim_utils.GroundPlaneCfg(), init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0)))
 
     # lights
     sky_light = AssetBaseCfg(
@@ -386,7 +386,7 @@ def _run_interactive_offset(sim: SimulationContext, scene: InteractiveScene, rob
         elif k == KEY.PAGE_UP:       state["offset"][2] += s
         elif k == KEY.PAGE_DOWN:     state["offset"][2] -= s
         elif k == KEY.NUMPAD_ADD:    state["step"] = min(state["step"] * 2.0, 1.0)
-        elif k == KEY.NUMPAD_SUB:    state["step"] = max(state["step"] / 2.0, 0.001)
+        elif k == KEY.NUMPAD_SUBTRACT: state["step"] = max(state["step"] / 2.0, 0.001)
         elif k == KEY.ENTER:         state["done"] = True
         elif k == KEY.BACKSPACE:     state["reset"] = True
         state["dirty"] = True
