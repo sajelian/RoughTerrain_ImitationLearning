@@ -2,7 +2,7 @@
 #SBATCH -n 1
 #SBATCH --cpus-per-task=16
 #SBATCH --gpus=rtx_4090:1
-#SBATCH --time=48:00:00
+#SBATCH --time=24:00:00
 #SBATCH --mem-per-cpu=16384
 #SBATCH --output=/cluster/scratch/%u/rt_il_logs/slurm-%j.out
 #SBATCH --error=/cluster/scratch/%u/rt_il_logs/slurm-%j.err
