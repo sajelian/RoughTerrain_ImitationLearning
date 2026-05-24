@@ -11,7 +11,7 @@ GMR_REPO="${GMR_REPO:-${HOME}/GMR}"
 SMPLX_TO_G1_SH="${GMR_REPO}/scripts/smplx_to_g1_csv.sh"
 
 # Mesh conversion tool (IsaacLab)
-CONVERT_MESH_PY="IsaacLab/scripts/tools/convert_mesh.py" # depends on location of IsaacLab repo
+CONVERT_MESH_PY="source/RT_IL/RT_IL/utils/convert_mesh.py"
 # --------------------------------------------
 
 usage() {
@@ -229,7 +229,11 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
     "${CROPPED_OBJ}" \
     "${USD_FILE}" \
     --make-instanceable \
-    --collision-approximation triangleMesh \
+    --collision-approximation convexDecomposition \
+    --hull-vertex-limit 16 \
+    --max-convex-hulls 64 \
+    --voxel-resolution 2560000 \
+    --shrink-wrap \
     ${HEADLESS_FLAG}
 
   [[ -f "${USD_FILE}" ]] || { echo "Expected USD not found: ${USD_FILE}" >&2; exit 1; }

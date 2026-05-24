@@ -176,6 +176,7 @@ print(f"  Done: {inside_vertices.sum()} vertices inside tube — {time.time()-t0
 
 faces_mask = inside_vertices[mesh.faces].all(axis=1)
 mesh = mesh.submesh([faces_mask], append=True, repair=False) if faces_mask.any() else trimesh.Trimesh()
+mesh.fix_normals()
 
 scene = trimesh.Scene([mesh, trajectory_path, start_sphere, end_sphere])
 if not args.headless:
