@@ -35,7 +35,7 @@ def parse_args():
     p.add_argument("--log_interval", type=int, default=500)
     p.add_argument("--save_interval", type=int, default=50_000)
     p.add_argument("--output_dir", type=str, required=True)
-    p.add_argument("--action_clip_pct", type=float, default=0.0,
+    p.add_argument("--action_clip_pct", type=float, default=0.01,
                    help="Per-joint percentile to clip the action tail at "
                         "([pct, 100-pct]). Removes rare reactive transients that "
                         "poison the flow fit. 0 = no clipping.")

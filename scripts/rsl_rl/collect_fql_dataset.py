@@ -16,7 +16,9 @@ Example:
         --wandb_path <wandb_run_path> \\
         --usd_name box_up \\
         --num_envs 4096 \\
-        --num_transitions 2000000
+        --num_transitions 2000000 \\
+        --action_noise_std 0.05 \\
+        --headless
 """
 
 import argparse

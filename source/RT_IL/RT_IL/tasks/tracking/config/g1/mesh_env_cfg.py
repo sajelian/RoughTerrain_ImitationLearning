@@ -295,7 +295,7 @@ class G1MeshEnvCfg_JOYSTICK_DISTILLATIONPLAY(G1MeshEnvCfg_JOYSTICK_DISTILLATION)
         self.commands.motion.debug_vis = False
         self.commands.motion.start_xy_noise_std = 0.0
         self.terminations.anchor_pos = None
-        # self.terminations.anchor_ori = None
+        self.terminations.anchor_ori.params["threshold"] = 0.6
         self.terminations.ee_feet_pos = None
         self.terminations.ee_hand_pos = None
         self.events.push_robot = None

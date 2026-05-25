@@ -34,7 +34,7 @@ from RT_IL.robots.g1 import G1_FOOT_LINKS, G1_HAND_LINKS
 
 from isaaclab.terrains.trimesh.utils import make_plane
 
-GROUND_HEIGHT = -0.25
+GROUND_HEIGHT = 0.03
 
 
 def lowered_flat_terrain(difficulty, cfg):
