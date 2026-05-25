@@ -455,18 +455,23 @@ class ObservationsCfg_JOYSTICK_DISTILLATION(ObservationsCfg_TRAIN):
 
     @configclass
     class StudentPolicyCfg(ObsGroup):
-        """Observations for the joystick-conditioned student policy."""
+        """Observations for the joystick-conditioned student policy.
+
+        Skill-expert architecture: when collecting from a motion-tracking expert
+        the joystick is *fixed at zero* (no velocity command — the skill is
+        being engaged) and skill_mode=1 (this transition belongs to the skill
+        regime). At deploy, the user releases the toggle for skill_mode=0 +
+        joystick from gamepad/keyboard (velocity-policy regime) or holds the
+        toggle for skill_mode=1 + joystick=0 (terrain-driven skill regime).
+        """
 
         joystick = ObsTerm(
-            func=mdp.motion_joystick_command,
-            params={
-                "command_name": "motion",
-                "horizon_s": 1.5,
-                "forward_speed": 0.8,
-                "turn_slow": 0.785,
-                "turn_fast": 1.571,
-            },
+            func=mdp.zero_joystick,
             history_length=PROPIO_HISTORY_SHORT,
+        )
+        skill_mode = ObsTerm(
+            func=mdp.skill_mode_constant,
+            params={"value": 1.0},   # skill-expert data
         )
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel,

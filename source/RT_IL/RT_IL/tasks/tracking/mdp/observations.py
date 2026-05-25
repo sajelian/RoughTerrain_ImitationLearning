@@ -307,6 +307,62 @@ def keyboard_joystick_command(
     return cmd.unsqueeze(0).expand(env.num_envs, -1)
 
 
+# ----------------------------------------------------------------------------
+# Skill-mode toggle: 1-bit obs that disambiguates "use locomotion velocity policy"
+# (skill_mode=0) from "engage an expert skill, terrain-driven" (skill_mode=1).
+# Set as a constant during data collection (one value per expert), and read
+# from a keyboard hold-key at deploy time.
+# ----------------------------------------------------------------------------
+
+
+def skill_mode_constant(env: ManagerBasedEnv, value: float = 0.0) -> torch.Tensor:
+    """Constant skill-mode bit per env. Used at data-collection time:
+    0.0 for the velocity expert's rollouts, 1.0 for skill-expert rollouts.
+    Returns shape (num_envs, 1).
+    """
+    return torch.full((env.num_envs, 1), float(value), dtype=torch.float32, device=env.device)
+
+
+def zero_joystick(env: ManagerBasedEnv) -> torch.Tensor:
+    """Always-zero joystick (vx, vy, wz) = (0, 0, 0). Used in skill-expert
+    collection so the joystick obs encodes 'no velocity command' while the
+    skill_mode bit is 1 — together they say 'engage a skill, terrain decides
+    which'. Returns shape (num_envs, 3).
+    """
+    return torch.zeros((env.num_envs, 3), dtype=torch.float32, device=env.device)
+
+
+def skill_mode_keyboard(env: ManagerBasedEnv, key: str = "SPACE") -> torch.Tensor:
+    """Hold-to-engage skill mode at deploy time. Press `key` for skill_mode=1
+    (engage expert skill); release for skill_mode=0 (back to locomotion velocity).
+    Returns shape (num_envs, 1).
+    """
+    if not hasattr(env, "_skill_mode_kb"):
+        import numpy as np
+        from isaaclab.devices import Se2Keyboard, Se2KeyboardCfg
+
+        # Reuse Se2Keyboard's listener infra; map only the toggle key.
+        kb = Se2Keyboard(Se2KeyboardCfg(
+            v_x_sensitivity=1.0,
+            v_y_sensitivity=0.0,
+            omega_z_sensitivity=0.0,
+            sim_device=env.device,
+        ))
+        kb._INPUT_KEY_MAPPING.clear()
+        kb._INPUT_KEY_MAPPING[key] = np.array([1.0, 0.0, 0.0])
+        env._skill_mode_kb = kb
+        env._skill_mode_prev = -1
+        print(f"[skill_mode] HOLD {key} to engage skill mode (skill_mode=1); release for velocity mode (skill_mode=0).")
+
+    raw = env._skill_mode_kb.advance()
+    val = 1.0 if raw[0].item() > 0.5 else 0.0
+    # Edge-trigger print so the user gets feedback on toggle changes.
+    if int(val) != env._skill_mode_prev:
+        print(f"[skill_mode] -> {int(val)}")
+        env._skill_mode_prev = int(val)
+    return torch.full((env.num_envs, 1), val, dtype=torch.float32, device=env.device)
+
+
 def motion_body_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     """Reference body orientations (absolute world frame) expressed in the robot anchor frame."""
     command: MotionCommand = env.command_manager.get_term(command_name)

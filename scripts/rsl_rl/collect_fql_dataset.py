@@ -41,10 +41,12 @@ parser.add_argument("--teacher_cfg", type=str, default="ppo", choices=["ppo", "p
                     help="Which PPO runner cfg matches the teacher's training. "
                          "'ppo' = G1MeshPPORunnerCfg ([512,256,128]); "
                          "'ppo_deploy' = G1MeshPPODeployRunnerCfg ([1024,512,256,128]).")
-parser.add_argument("--registry_name", type=str, required=True,
-                    help="W&B motion artifact name (clip for this expert).")
+parser.add_argument("--registry_name", type=str, default=None,
+                    help="W&B motion artifact name (required for motion-tracking envs; "
+                         "omit for velocity-tracking envs that have no motion command).")
 parser.add_argument("--usd_name", type=str, default=None,
-                    help="Name of the obstacle USD mesh (matches the clip).")
+                    help="Name of the obstacle USD mesh (matches the clip). Omit for "
+                         "envs without an obstacle prim (e.g. the velocity env).")
 parser.add_argument("--num_transitions", type=int, default=2_000_000,
                     help="Target number of (s, a, r, s', done) tuples to collect.")
 parser.add_argument("--action_noise_std", type=float, default=0.0,
@@ -61,7 +63,10 @@ sys.argv = [sys.argv[0]] + hydra_args
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-usd_path, usd_cfg = load_usd_config(args_cli.usd_name)
+if args_cli.usd_name:
+    usd_path, usd_cfg = load_usd_config(args_cli.usd_name)
+else:
+    usd_path, usd_cfg = None, {}
 
 
 import gymnasium as gym
@@ -126,26 +131,32 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
         resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
         print(f"[INFO] Teacher checkpoint: {resume_path}")
 
-    # Resolve motion file from W&B registry.
-    import wandb
-    api = wandb.Api()
-    registry_name = args_cli.registry_name
-    if ":" not in registry_name:
-        registry_name += ":latest"
-    artifact = api.artifact(registry_name)
-    env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
+    # Resolve motion file from W&B registry — only if this env has a motion command.
+    if args_cli.registry_name is not None and hasattr(env_cfg.commands, "motion"):
+        import wandb
+        api = wandb.Api()
+        registry_name = args_cli.registry_name
+        if ":" not in registry_name:
+            registry_name += ":latest"
+        artifact = api.artifact(registry_name)
+        env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
+    elif hasattr(env_cfg.commands, "motion"):
+        raise ValueError(
+            "Env has a `motion` command term but --registry_name was not provided."
+        )
 
-    # Substitute obstacle USD.
-    env_cfg.scene.obstacle = env_cfg.scene.obstacle.replace(
-        spawn=env_cfg.scene.obstacle.spawn.replace(
-            usd_path=usd_path,
-            scale=tuple(usd_cfg.get("scale", (1.0, 1.0, 1.0))),
-        ),
-        init_state=env_cfg.scene.obstacle.init_state.replace(
-            pos=tuple(usd_cfg.get("translation", (0.0, 0.0, 0.0))),
-            rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
-        ),
-    )
+    # Substitute obstacle USD — only if both the env has an obstacle prim and a USD was given.
+    if usd_path is not None and getattr(env_cfg.scene, "obstacle", None) is not None:
+        env_cfg.scene.obstacle = env_cfg.scene.obstacle.replace(
+            spawn=env_cfg.scene.obstacle.spawn.replace(
+                usd_path=usd_path,
+                scale=tuple(usd_cfg.get("scale", (1.0, 1.0, 1.0))),
+            ),
+            init_state=env_cfg.scene.obstacle.init_state.replace(
+                pos=tuple(usd_cfg.get("translation", (0.0, 0.0, 0.0))),
+                rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
+            ),
+        )
 
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode=None)
     if isinstance(env.unwrapped, DirectMARLEnv):

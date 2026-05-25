@@ -300,10 +300,16 @@ class G1MeshEnvCfg_JOYSTICK_DISTILLATIONPLAY(G1MeshEnvCfg_JOYSTICK_DISTILLATION)
         self.terminations.ee_hand_pos = None
         self.events.push_robot = None
 
-        # Replace motion-derived joystick with live keyboard — same discrete command
-        # space as training (low_speed/high_speed/turn_omega must match ObsTerm above).
+        # Replace zero joystick with live keyboard (WASD/QE/ZX for velocity command).
         self.observations.student.joystick = ObsTerm(
             func=mdp.keyboard_joystick_command,
             params={"forward_speed": 0.8, "turn_slow": 0.785, "turn_fast": 1.571},
             history_length=self.observations.student.joystick.history_length,
+        )
+        # Replace constant skill_mode=1 with live keyboard toggle. HOLD SPACE
+        # to engage skill mode (skill_mode=1, terrain-driven skill); release
+        # for skill_mode=0 (velocity-tracking from keyboard joystick).
+        self.observations.student.skill_mode = ObsTerm(
+            func=mdp.skill_mode_keyboard,
+            params={"key": "SPACE"},
         )
