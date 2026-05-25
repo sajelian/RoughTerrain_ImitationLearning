@@ -58,8 +58,12 @@ def parse_args():
                    help="BC coefficient (the paper's single major knob). "
                         "Suggested: humanoid locomotion=30, contact-rich manipulation=300, "
                         "dexterous=3000-30000. Sweep {30, 100, 300} for new tasks.")
-    p.add_argument("--q_normalize", action="store_true",
-                   help="(Non-paper) enable EMA-based Q normalization. Off by default.")
+    p.add_argument("--q_normalize", action=argparse.BooleanOptionalAction, default=True,
+                   help="Enable batch-wise 1/mean(|Q|) normalization in the actor loss "
+                        "(paper App. B recommendation for new tasks). "
+                        "Use --no-q_normalize to disable. With normalization on, the paper's "
+                        "recommended alpha range is {0.03, 0.1, 0.3, 1, 3, 10}; without it, "
+                        "alpha must scale with the reward magnitude (paper uses 100-30000).")
     p.add_argument("--flow_hidden", type=int, nargs="+", default=[1024, 1024, 512, 512],
                    help="Wider than paper default ([512]×4) because our student obs is ~988-dim "
                         "(a bottleneck at layer-1=512 instead of expansion).")
