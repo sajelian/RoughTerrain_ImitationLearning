@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from typing import TYPE_CHECKING
 
-from isaaclab.utils.math import matrix_from_quat, quat_apply_inverse, subtract_frame_transforms, yaw_quat
+from isaaclab.utils.math import matrix_from_quat, quat_apply_inverse, subtract_frame_transforms
 from isaaclab.managers import SceneEntityCfg
 
 from RT_IL.tasks.tracking.mdp.commands import MotionCommand
@@ -141,97 +141,6 @@ def motion_body_pos_error_b(env: ManagerBasedEnv, command_name: str) -> torch.Te
         error_w.reshape(-1, 3),
     ).reshape(env.num_envs, num_bodies, 3)
     return error_b.view(env.num_envs, -1)
-
-
-def _quantize_joystick(
-    speed_ema: torch.Tensor,
-    wz: torch.Tensor,
-    forward_speed: float,
-    turn_slow: float,
-    turn_fast: float,
-) -> torch.Tensor:
-    """Snap smoothed planar speed + continuous wz to the discrete command space.
-
-    speed_ema is an EMA-smoothed norm(vx, vy) so brief torso stillness mid-skill
-    does not flip the label back to stop.
-    vx_out ∈ {0, forward_speed},  vy_out = 0,  wz ∈ {±turn_fast, ±turn_slow, 0}.
-    """
-    vx_q = torch.where(speed_ema >= 0.1,
-                        torch.full_like(speed_ema, forward_speed),
-                        torch.zeros_like(speed_ema))
-
-    slow_thresh = turn_slow * 0.5
-    fast_thresh = (turn_slow + turn_fast) * 0.5
-    wz_q = torch.where(
-        wz > slow_thresh,
-        torch.where(wz > fast_thresh, torch.full_like(wz, turn_fast), torch.full_like(wz, turn_slow)),
-        torch.where(
-            wz < -slow_thresh,
-            torch.where(wz < -fast_thresh, torch.full_like(wz, -turn_fast), torch.full_like(wz, -turn_slow)),
-            torch.zeros_like(wz),
-        ),
-    )
-
-    return torch.stack([vx_q, torch.zeros_like(vx_q), wz_q], dim=-1)
-
-
-def motion_joystick_command(
-    env: ManagerBasedEnv,
-    command_name: str,
-    horizon_s: float = 1.5,
-    forward_speed: float = 0.8,
-    turn_slow: float = 0.785,   # π/4 rad/s ≈ 45°/s
-    turn_fast: float = 1.571,   # π/2 rad/s ≈ 90°/s
-    speed_ema_tau_s: float = 0.3,
-) -> torch.Tensor:
-    """Discrete joystick command (vx, vy=0, omega_yaw) derived from the motion reference.
-
-    Average velocity is (pos[t+H] - pos[t]) / H — temporal integral cancels gait
-    oscillation. Planar speed norm is smoothed with an exponential moving average
-    (tau=0.3s) before thresholding. 0.3s is short enough to preserve genuine stop
-    phases (1+ seconds) while bridging sub-frame hiccups (<0.2s).
-    Quantised to {0, forward_speed} × {±turn_fast, ±turn_slow, 0}.
-    Returns shape (num_envs, 3).
-    """
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    motion = command.motion
-
-    control_dt = env.cfg.decimation * env.cfg.sim.dt
-    H = max(1, int(horizon_s / control_dt))
-    T = motion.time_step_total
-    raw_anchor_idx = int(motion._body_indexes[command.motion_anchor_body_index].item())
-
-    t = command.time_steps                           # (N,) int64
-    future_t = (t + H).clamp(max=T - 1)             # (N,) int64
-    actual_dt = (future_t - t).float() * control_dt  # (N,) shorter at clip end
-
-    pos_now = motion._body_pos_w[t, raw_anchor_idx]        # (N, 3)
-    pos_fut = motion._body_pos_w[future_t, raw_anchor_idx]  # (N, 3)
-    avg_vel_w = (pos_fut - pos_now) / actual_dt.clamp(min=1e-6).unsqueeze(-1)
-
-    q_now = motion._body_quat_w[t, raw_anchor_idx]
-    q_fut = motion._body_quat_w[future_t, raw_anchor_idx]
-    yaw_now = torch.atan2(
-        2.0 * (q_now[:, 0] * q_now[:, 3] + q_now[:, 1] * q_now[:, 2]),
-        1.0 - 2.0 * (q_now[:, 2] ** 2 + q_now[:, 3] ** 2),
-    )
-    yaw_fut = torch.atan2(
-        2.0 * (q_fut[:, 0] * q_fut[:, 3] + q_fut[:, 1] * q_fut[:, 2]),
-        1.0 - 2.0 * (q_fut[:, 2] ** 2 + q_fut[:, 3] ** 2),
-    )
-    d_yaw = (yaw_fut - yaw_now + torch.pi) % (2 * torch.pi) - torch.pi
-    omega_z = d_yaw / actual_dt.clamp(min=1e-6)
-
-    heading_quat = yaw_quat(_safe_quat(command.robot_anchor_quat_w))
-    lin_vel_h = quat_apply_inverse(heading_quat, avg_vel_w)
-    speed = (lin_vel_h[:, 0] ** 2 + lin_vel_h[:, 1] ** 2).sqrt()
-
-    # EMA smoothing: bridges brief torso stillness within a skill.
-    # _joystick_speed_ema is owned and reset by MotionCommand (initialized to 0 on episode reset).
-    alpha = float(torch.exp(torch.tensor(-control_dt / speed_ema_tau_s)).item())
-    command._joystick_speed_ema = alpha * command._joystick_speed_ema + (1.0 - alpha) * speed
-
-    return _quantize_joystick(command._joystick_speed_ema, omega_z, forward_speed, turn_slow, turn_fast)
 
 
 def keyboard_joystick_command(

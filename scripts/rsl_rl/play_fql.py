@@ -25,10 +25,15 @@ parser.add_argument("--checkpoint", type=str, required=True,
                     help="Path to agent_*.pt produced by train_fql.py.")
 parser.add_argument("--normalizer", type=str, default=None,
                     help="Path to normalizer.pt (default: <checkpoint_dir>/normalizer.pt).")
-parser.add_argument("--task", type=str, default="Tracking-Mesh-G1-Joystick-Distillation-Play-v0")
-parser.add_argument("--registry_name", type=str, required=True,
-                    help="W&B motion artifact (must match training data clip).")
-parser.add_argument("--usd_name", type=str, default=None)
+parser.add_argument("--task", type=str, default="Deploy-G1-v0",
+                    help="Deploy-G1-v0 is the clean deploy env (no motion clip). "
+                         "Use Tracking-Mesh-G1-Joystick-Distillation-Play-v0 only for "
+                         "legacy/sanity testing with the motion-tracking infrastructure.")
+parser.add_argument("--registry_name", type=str, default=None,
+                    help="W&B motion artifact — required only for legacy tracking-env tasks "
+                         "that have a motion command. Deploy-G1-v0 does not need it.")
+parser.add_argument("--usd_name", type=str, default=None,
+                    help="Obstacle USD to load at runtime. Omit for flat-ground deploy.")
 parser.add_argument("--num_envs", type=int, default=1)
 parser.add_argument("--disable_fabric", action="store_true", default=False)
 
@@ -48,7 +53,10 @@ sys.argv = [sys.argv[0]] + hydra_args
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-usd_path, usd_cfg = load_usd_config(args_cli.usd_name)
+if args_cli.usd_name:
+    usd_path, usd_cfg = load_usd_config(args_cli.usd_name)
+else:
+    usd_path, usd_cfg = None, {}
 
 
 import gymnasium as gym
@@ -69,24 +77,28 @@ from RT_IL.algorithms.fql import FQLAgent, FQLConfig
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _agent_cfg):
     env_cfg.scene.num_envs = args_cli.num_envs
 
-    # Motion file from W&B registry.
-    import wandb
-    api = wandb.Api()
-    reg = args_cli.registry_name if ":" in args_cli.registry_name else args_cli.registry_name + ":latest"
-    artifact = api.artifact(reg)
-    env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
+    # Motion file — only when the env actually has a motion command term
+    # (legacy tracking play envs). Deploy-G1-v0 doesn't have one.
+    if args_cli.registry_name is not None and hasattr(env_cfg.commands, "motion"):
+        import wandb
+        import pathlib as _pathlib
+        api = wandb.Api()
+        reg = args_cli.registry_name if ":" in args_cli.registry_name else args_cli.registry_name + ":latest"
+        artifact = api.artifact(reg)
+        env_cfg.commands.motion.motion_file = str(_pathlib.Path(artifact.download()) / "motion.npz")
 
-    # Obstacle USD.
-    env_cfg.scene.obstacle = env_cfg.scene.obstacle.replace(
-        spawn=env_cfg.scene.obstacle.spawn.replace(
-            usd_path=usd_path,
-            scale=tuple(usd_cfg.get("scale", (1.0, 1.0, 1.0))),
-        ),
-        init_state=env_cfg.scene.obstacle.init_state.replace(
-            pos=tuple(usd_cfg.get("translation", (0.0, 0.0, 0.0))),
-            rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
-        ),
-    )
+    # Obstacle USD swap — only if both the env has an obstacle prim and a USD was given.
+    if usd_path is not None and getattr(env_cfg.scene, "obstacle", None) is not None:
+        env_cfg.scene.obstacle = env_cfg.scene.obstacle.replace(
+            spawn=env_cfg.scene.obstacle.spawn.replace(
+                usd_path=usd_path,
+                scale=tuple(usd_cfg.get("scale", (1.0, 1.0, 1.0))),
+            ),
+            init_state=env_cfg.scene.obstacle.init_state.replace(
+                pos=tuple(usd_cfg.get("translation", (0.0, 0.0, 0.0))),
+                rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
+            ),
+        )
 
     env = gym.make(args_cli.task, cfg=env_cfg)
     if isinstance(env.unwrapped, DirectMARLEnv):

@@ -153,18 +153,6 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_entropy"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["sampling_top1_prob"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["sampling_top1_bin"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["joystick_vx_error"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["joystick_wz_error"] = torch.zeros(self.num_envs, device=self.device)
-
-        # Cache for joystick metric computation and EMA state
-        control_dt = env.cfg.decimation * env.cfg.sim.dt
-        self._joystick_H = max(1, int(1.5 / control_dt))
-        self._joystick_control_dt = control_dt
-        self._joystick_anchor_idx = int(
-            self.motion._body_indexes[self.motion_anchor_body_index].item()
-        )
-        # EMA state for joystick speed smoothing — reset per env on episode restart
-        self._joystick_speed_ema = torch.zeros(self.num_envs, device=self.device)
 
     @property
     def command(self) -> torch.Tensor:
@@ -288,27 +276,6 @@ class MotionCommand(CommandTerm):
         self.metrics["error_joint_pos"] = torch.norm(self.joint_pos - self.robot_joint_pos, dim=-1)
         self.metrics["error_joint_vel"] = torch.norm(self.joint_vel - self.robot_joint_vel, dim=-1)
 
-        # Joystick tracking: compare motion-derived forward velocity / yaw rate to actual
-        T = self.motion.time_step_total
-        future_t = (self.time_steps + self._joystick_H).clamp(max=T - 1)
-        actual_dt = (future_t - self.time_steps).float() * self._joystick_control_dt
-        a = self._joystick_anchor_idx
-        pos_now = self.motion._body_pos_w[self.time_steps, a]
-        pos_fut = self.motion._body_pos_w[future_t, a]
-        avg_vel_w = (pos_fut - pos_now) / actual_dt.clamp(min=1e-6).unsqueeze(-1)
-        heading_quat = yaw_quat(self.robot_anchor_quat_w)
-        vx_cmd = quat_apply(quat_inv(heading_quat), avg_vel_w)[:, 0]
-        vx_actual = quat_apply(quat_inv(heading_quat), self.robot.data.root_lin_vel_w)[:, 0]
-        q_now = self.motion._body_quat_w[self.time_steps, a]
-        q_fut = self.motion._body_quat_w[future_t, a]
-        yaw_now = torch.atan2(2.0*(q_now[:,0]*q_now[:,3]+q_now[:,1]*q_now[:,2]), 1.0-2.0*(q_now[:,2]**2+q_now[:,3]**2))
-        yaw_fut = torch.atan2(2.0*(q_fut[:,0]*q_fut[:,3]+q_fut[:,1]*q_fut[:,2]), 1.0-2.0*(q_fut[:,2]**2+q_fut[:,3]**2))
-        wz_cmd = (yaw_fut - yaw_now + torch.pi) % (2 * torch.pi) - torch.pi
-        wz_cmd = wz_cmd / actual_dt.clamp(min=1e-6)
-        wz_actual = self.robot.data.root_ang_vel_w[:, 2]
-        self.metrics["joystick_vx_error"] = (vx_cmd - vx_actual).abs()
-        self.metrics["joystick_wz_error"] = (wz_cmd - wz_actual).abs()
-
     def _adaptive_sampling(self, env_ids: Sequence[int]):
         episode_failed = self._env.termination_manager.terminated[env_ids]
         if torch.any(episode_failed):
@@ -368,24 +335,6 @@ class MotionCommand(CommandTerm):
         self._adaptive_sampling(env_ids)
         if self._valid_rsi_indices is not None:
             self._snap_to_valid_rsi(env_ids)
-
-        # Reset joystick EMA to the clip's actual speed at the newly-sampled timestep
-        # so labels are correct from frame 1 (avoids carrying over speed from the old episode
-        # and avoids artificial "stop" labels when clip starts mid-motion).
-        t0 = self.time_steps[env_ids]
-        future_t0 = (t0 + self._joystick_H).clamp(max=self.motion.time_step_total - 1)
-        actual_dt0 = (future_t0 - t0).float() * self._joystick_control_dt
-        a = self._joystick_anchor_idx
-        pos_now0 = self.motion._body_pos_w[t0, a]
-        pos_fut0 = self.motion._body_pos_w[future_t0, a]
-        avg_vel_w0 = (pos_fut0 - pos_now0) / actual_dt0.clamp(min=1e-6).unsqueeze(-1)
-        # project into yaw frame using the motion clip's heading (robot hasn't spawned yet)
-        q0 = self.motion._body_quat_w[t0, a]
-        yaw0 = torch.atan2(2.0*(q0[:,0]*q0[:,3]+q0[:,1]*q0[:,2]), 1.0-2.0*(q0[:,2]**2+q0[:,3]**2))
-        cy, sy = torch.cos(yaw0), torch.sin(yaw0)
-        vx_h0 = cy * avg_vel_w0[:, 0] + sy * avg_vel_w0[:, 1]
-        vy_h0 = -sy * avg_vel_w0[:, 0] + cy * avg_vel_w0[:, 1]
-        self._joystick_speed_ema[env_ids] = (vx_h0**2 + vy_h0**2).sqrt()
 
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()

@@ -71,13 +71,12 @@ def main(env_cfg, agent_cfg):
     for name, tensor in obs.items():
         print(f"  {name:>10s}  shape={tuple(tensor.shape)}  dtype={tensor.dtype}")
 
-    print("\n=== first 'joystick' value per env (should match motion start velocity) ===")
-    # extract joystick: it's the first 3 dims * PROPIO_HISTORY_SHORT of student
-    # but since obs is concatenated, easier to call the obs func directly
-    from RT_IL.tasks.tracking.mdp.observations import motion_joystick_command
-    joystick = motion_joystick_command(env.unwrapped, command_name="motion", horizon_s=1.5)
-    for i, j in enumerate(joystick):
-        print(f"  env {i}: vx={j[0]:+.3f}  vy={j[1]:+.3f}  wz={j[2]:+.3f}")
+    # NOTE: motion_joystick_command was removed — the joystick is now sourced from
+    # the env's command (velocity env) or set to zero (skill envs). For skill envs
+    # the first 3 dims of obs["student"] should all be 0.0.
+    student = obs["student"]
+    print(f"\n=== first 3 dims of obs['student'] (joystick slot) ===")
+    print(f"  env 0: {student[0, :3].tolist()}  (expected ~0 for skill env)")
 
     actions = torch.zeros((args.num_envs, env.unwrapped.action_manager.total_action_dim),
                           device=env.unwrapped.device)
