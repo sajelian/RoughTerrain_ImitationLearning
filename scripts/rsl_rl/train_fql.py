@@ -35,7 +35,7 @@ def parse_args():
     p.add_argument("--log_interval", type=int, default=500)
     p.add_argument("--save_interval", type=int, default=50_000)
     p.add_argument("--output_dir", type=str, required=True)
-    p.add_argument("--action_clip_pct", type=float, default=0.5,
+    p.add_argument("--action_clip_pct", type=float, default=0.0,
                    help="Per-joint percentile to clip the action tail at "
                         "([pct, 100-pct]). Removes rare reactive transients that "
                         "poison the flow fit. 0 = no clipping.")
@@ -54,7 +54,7 @@ def parse_args():
     p.add_argument("--onestep_lr", type=float, default=3e-4)
     p.add_argument("--q_lr", type=float, default=3e-4)
     p.add_argument("--flow_integration_steps", type=int, default=10)
-    p.add_argument("--alpha", type=float, default=100.0,
+    p.add_argument("--alpha", type=float, default=3.0,
                    help="BC coefficient (the paper's single major knob). "
                         "Suggested: humanoid locomotion=30, contact-rich manipulation=300, "
                         "dexterous=3000-30000. Sweep {30, 100, 300} for new tasks.")
