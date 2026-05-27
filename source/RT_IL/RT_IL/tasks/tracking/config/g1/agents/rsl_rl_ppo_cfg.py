@@ -27,7 +27,7 @@ class G1MeshPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         clip_param=0.2,
         entropy_coef=0.005,
         num_learning_epochs=5,
-        num_mini_batches=8,  # 8 at 8192 envs, 16 at 16384 envs
+        num_mini_batches=4,  # 4 at 4096 envs, 8 at 8192, 16 at 16384
         learning_rate=1.0e-3,
         schedule="adaptive",
         gamma=0.99,

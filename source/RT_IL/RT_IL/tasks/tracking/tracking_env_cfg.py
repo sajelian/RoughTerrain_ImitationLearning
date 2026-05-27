@@ -34,7 +34,7 @@ from RT_IL.robots.g1 import G1_FOOT_LINKS, G1_HAND_LINKS
 
 from isaaclab.terrains.trimesh.utils import make_plane
 
-GROUND_HEIGHT = 0.03
+GROUND_HEIGHT = -10.0
 
 
 def lowered_flat_terrain(difficulty, cfg):
@@ -109,7 +109,7 @@ class MySceneCfg(InteractiveSceneCfg):
             dynamic_friction=1.0,
         ),
         visual_material=sim_utils.MdlFileCfg(
-            mdl_path="{NVIDIA_NUCLEUS_DIR}/Materials/Base/Architecture/Shingles_01.mdl",
+            mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
             project_uvw=True,
         ),
     )

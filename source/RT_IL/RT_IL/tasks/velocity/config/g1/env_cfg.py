@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
+from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors.ray_caster import MultiMeshRayCasterCfg, RayCasterCfg, patterns
 from isaaclab.utils import configclass
@@ -28,6 +29,7 @@ from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 from isaaclab_tasks.manager_based.locomotion.velocity.config.g1.rough_env_cfg import (
     G1RoughEnvCfg,
+    G1Rewards,
     G1RoughEnvCfg_PLAY,
 )
 from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import ObservationsCfg
@@ -42,6 +44,27 @@ from RT_IL.robots.g1 import G1_CYLINDER_CFG, G1_HYBRID_ACTION_SCALE
 # Mirror the joystick-distillation student history lengths exactly.
 PROPIO_HISTORY_SHORT = 5
 PROPIO_HISTORY_LONG = 8
+
+
+@configclass
+class CriticCfg(ObsGroup):
+    """Observations for policy group."""
+
+    # observation terms (order preserved)
+    base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+    base_ang_vel = ObsTerm(func=mdp.base_ang_vel, scale=0.2)
+    projected_gravity = ObsTerm(
+        func=mdp.projected_gravity,
+    )
+    velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+    joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+    joint_vel = ObsTerm(func=mdp.joint_vel_rel, scale=0.05)
+    actions = ObsTerm(func=mdp.last_action)
+    height_scan = ObsTerm(
+        func=mdp.height_scan,
+        params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+        clip=(-1.0, 1.0),
+    )
 
 
 @configclass
@@ -96,34 +119,61 @@ class StudentPolicyCfg(ObsGroup):
 @configclass
 class ObservationsCfg_Distillation(ObservationsCfg):
     """Extend the standard ObservationsCfg with the student group."""
-    @configclass
-    class CriticCfg(ObsGroup):
-        """Observations for policy group."""
-
-        # observation terms (order preserved)
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
-        projected_gravity = ObsTerm(func=mdp.projected_gravity)
-        velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
-        actions = ObsTerm(func=mdp.last_action)
-        height_scan = ObsTerm(
-            func=mdp.height_scan,
-            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-            clip=(-1.0, 1.0),
-        )
-
     # observation groups
     critic: CriticCfg = CriticCfg()
     student: StudentPolicyCfg = StudentPolicyCfg()
 
 
 @configclass
+class RewardsCfg_TRAIN(G1Rewards):
+    """Reward terms for the MDP.
+
+    Overrides joint-name regexes in G1Rewards to match our G1_CYLINDER_CFG /
+    main.urdf. IsaacLab's G1_MINIMAL_CFG has split `*_elbow_{pitch,roll}_joint`,
+    finger joints, and a single `torso_joint`. Ours has a single `*_elbow_joint`,
+    `*_wrist_{roll,pitch,yaw}_joint` instead of fingers, and
+    `waist_{yaw,roll,pitch}_joint` instead of `torso_joint`. Without these
+    overrides the reward manager errors out on joint-name regex match.
+    """
+
+    # Replace fingers reward (no fingers on our robot) with wrist deviation.
+    joint_deviation_fingers = None
+    joint_deviation_wrist = RewTerm(
+        func=mdp_std.joint_deviation_l1,
+        weight=-0.05,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    ".*_wrist_roll_joint",
+                    ".*_wrist_pitch_joint",
+                    ".*_wrist_yaw_joint",
+                ],
+            )
+        },
+    )
+
+    def __post_init__(self):
+        self.joint_deviation_arms.params["asset_cfg"] = SceneEntityCfg(
+            "robot",
+            joint_names=[
+                ".*_shoulder_pitch_joint",
+                ".*_shoulder_roll_joint",
+                ".*_shoulder_yaw_joint",
+                ".*_elbow_joint",
+            ],
+        )
+        self.joint_deviation_torso.params["asset_cfg"] = SceneEntityCfg(
+            "robot",
+            joint_names=["waist_yaw_joint", "waist_roll_joint", "waist_pitch_joint"],
+        )
+
+@configclass
 class G1VelocityDistillationEnvCfg(G1RoughEnvCfg):
     """Training-ready velocity-tracking env with the student obs group attached."""
 
     observations: ObservationsCfg_Distillation = ObservationsCfg_Distillation()
+    rewards: RewardsCfg_TRAIN = RewardsCfg_TRAIN()
 
     def __post_init__(self):
         super().__post_init__()
@@ -146,31 +196,11 @@ class G1VelocityDistillationEnvCfg(G1RoughEnvCfg):
             update_period=self.decimation * self.sim.dt,
         )
 
-        # --- Fix inherited G1Rewards joint references for our G1_CYLINDER_CFG.
-        # IsaacLab's G1_MINIMAL_CFG has split elbow_pitch/elbow_roll joints,
-        # fingers, and a `torso_joint`. Ours has a single `*_elbow_joint`, no
-        # fingers, and waist_{yaw,roll,pitch}_joint instead. Without these
-        # overrides the reward manager errors out on joint-name regex match.
-        self.rewards.joint_deviation_arms.params["asset_cfg"] = SceneEntityCfg(
-            "robot",
-            joint_names=[
-                ".*_shoulder_pitch_joint",
-                ".*_shoulder_roll_joint",
-                ".*_shoulder_yaw_joint",
-                ".*_elbow_joint",
-            ],
-        )
-        self.rewards.joint_deviation_fingers = None  # type: ignore[assignment]
-        self.rewards.joint_deviation_torso.params["asset_cfg"] = SceneEntityCfg(
-            "robot",
-            joint_names=["waist_yaw_joint", "waist_roll_joint", "waist_pitch_joint"],
-        )
-
-
 @configclass
 class G1VelocityDistillationEnvCfg_PLAY(G1RoughEnvCfg_PLAY):
     """PLAY variant — fewer envs, terrain curriculum off, viz robot if desired."""
 
+    rewards: RewardsCfg_TRAIN = RewardsCfg_TRAIN()
     observations: ObservationsCfg_Distillation = ObservationsCfg_Distillation()
 
     def __post_init__(self):
