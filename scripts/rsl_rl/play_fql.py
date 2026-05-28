@@ -99,6 +99,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
                 rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
             ),
         )
+    elif usd_path is None and getattr(env_cfg.scene, "obstacle", None) is not None:
+        # No obstacle requested — remove the prim so IsaacLab doesn't try to open
+        # the empty usd_path, and drop the obstacle target from the height scanner.
+        env_cfg.scene.obstacle = None
+        if getattr(env_cfg.scene, "height_scanner", None) is not None:
+            env_cfg.scene.height_scanner = env_cfg.scene.height_scanner.replace(
+                mesh_prim_paths=["/World/ground"]
+            )
 
     env = gym.make(args_cli.task, cfg=env_cfg)
     if isinstance(env.unwrapped, DirectMARLEnv):
