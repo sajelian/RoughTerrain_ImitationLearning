@@ -22,6 +22,7 @@ from __future__ import annotations
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
+from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors.ray_caster import MultiMeshRayCasterCfg, RayCasterCfg, patterns
 from isaaclab.utils import configclass
@@ -32,7 +33,7 @@ from isaaclab_tasks.manager_based.locomotion.velocity.config.g1.rough_env_cfg im
     G1Rewards,
     G1RoughEnvCfg_PLAY,
 )
-from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import ObservationsCfg
+from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import ObservationsCfg, TerminationsCfg
 
 import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp_std  # for standard obs funcs
 import RT_IL.tasks.velocity.mdp as mdp                                  # for velocity_command_joystick
@@ -168,12 +169,37 @@ class RewardsCfg_TRAIN(G1Rewards):
             joint_names=["waist_yaw_joint", "waist_roll_joint", "waist_pitch_joint"],
         )
 
+
+@configclass
+class TerminationsCfg_TRAIN(TerminationsCfg):
+    """Termination terms for the MDP."""
+    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    bad_orientation = DoneTerm(func=mdp.bad_orientation, params={"limit_angle": 0.80})
+    fall_contact = DoneTerm(
+        func=mdp.illegal_contact,
+        params={
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces",
+                body_names=[
+                    "pelvis",
+                    "torso_link",
+                    ".*_hip_pitch_link",
+                    ".*_hip_roll_link",
+                    ".*_hip_yaw_link",
+                ],
+            ),
+            "threshold": 1.0,
+        },
+    )
+
+
 @configclass
 class G1VelocityDistillationEnvCfg(G1RoughEnvCfg):
     """Training-ready velocity-tracking env with the student obs group attached."""
 
     observations: ObservationsCfg_Distillation = ObservationsCfg_Distillation()
     rewards: RewardsCfg_TRAIN = RewardsCfg_TRAIN()
+    terminations: TerminationsCfg_TRAIN = TerminationsCfg_TRAIN()
 
     def __post_init__(self):
         super().__post_init__()
@@ -195,6 +221,7 @@ class G1VelocityDistillationEnvCfg(G1RoughEnvCfg):
             mesh_prim_paths=["/World/ground"],
             update_period=self.decimation * self.sim.dt,
         )
+        self.terminations.base_contact = None
 
 @configclass
 class G1VelocityDistillationEnvCfg_PLAY(G1RoughEnvCfg_PLAY):
@@ -202,6 +229,7 @@ class G1VelocityDistillationEnvCfg_PLAY(G1RoughEnvCfg_PLAY):
 
     rewards: RewardsCfg_TRAIN = RewardsCfg_TRAIN()
     observations: ObservationsCfg_Distillation = ObservationsCfg_Distillation()
+    terminations: TerminationsCfg_TRAIN = TerminationsCfg_TRAIN()
 
     def __post_init__(self):
         super().__post_init__()
@@ -217,3 +245,9 @@ class G1VelocityDistillationEnvCfg_PLAY(G1RoughEnvCfg_PLAY):
             mesh_prim_paths=["/World/ground"],
             update_period=self.decimation * self.sim.dt,
         )
+        self.terminations.base_contact = None
+
+        self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+        self.commands.base_velocity.ranges.heading = (0.0, 0.0)
