@@ -154,6 +154,21 @@ class RewardsCfg_TRAIN(G1Rewards):
         },
     )
 
+    feet_clearance = RewTerm(
+        func=mdp.foot_clearance,
+        weight=1.0,
+        params={
+            "std": 0.05,
+            "tanh_mult": 2.0,
+            "target_height": 0.1,
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*ankle_roll.*"),
+            },
+    )
+    
+    stand_still = RewTerm(
+        func=mdp.joint_pos_stand_still, weight=-1.0, params={"command_name": "base_velocity", "threshold": 0.05}
+    )
+
     def __post_init__(self):
         self.joint_deviation_arms.params["asset_cfg"] = SceneEntityCfg(
             "robot",
@@ -168,6 +183,10 @@ class RewardsCfg_TRAIN(G1Rewards):
             "robot",
             joint_names=["waist_yaw_joint", "waist_roll_joint", "waist_pitch_joint"],
         )
+
+        self.lin_vel_z_l2.weight = -0.1
+        self.undesired_contacts.params["sensor_cfg"] = SceneEntityCfg("contact_forces", body_names="(?!.*ankle.*).*")
+        self.feet_air_time = None
 
 
 @configclass
@@ -223,6 +242,10 @@ class G1VelocityDistillationEnvCfg(G1RoughEnvCfg):
         )
         self.terminations.base_contact = None
 
+        self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
+        self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+
 @configclass
 class G1VelocityDistillationEnvCfg_PLAY(G1RoughEnvCfg_PLAY):
     """PLAY variant — fewer envs, terrain curriculum off, viz robot if desired."""
@@ -248,6 +271,5 @@ class G1VelocityDistillationEnvCfg_PLAY(G1RoughEnvCfg_PLAY):
         self.terminations.base_contact = None
 
         self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
-        self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
-        self.commands.base_velocity.ranges.heading = (0.0, 0.0)
