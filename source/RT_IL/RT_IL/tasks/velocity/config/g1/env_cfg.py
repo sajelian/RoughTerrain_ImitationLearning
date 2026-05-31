@@ -242,9 +242,14 @@ class G1VelocityDistillationEnvCfg(G1RoughEnvCfg):
         )
         self.terminations.base_contact = None
 
-        self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
-        self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
-        self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+        # change here to collect different command distributions
+        # self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
+        # self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
+        # self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (-0.0, 0.0)
+
 
 @configclass
 class G1VelocityDistillationEnvCfg_PLAY(G1RoughEnvCfg_PLAY):
@@ -258,7 +263,7 @@ class G1VelocityDistillationEnvCfg_PLAY(G1RoughEnvCfg_PLAY):
         super().__post_init__()
         self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.actions.joint_pos.scale = G1_HYBRID_ACTION_SCALE
-        self.scene.height_scanner = MultiMeshRayCasterCfg(
+        self.scene.height_scanner = MultiMeshRayCasterCfg(  # TODO replace this with noised multi ray down the road
             prim_path="{ENV_REGEX_NS}/Robot/torso_link",
             history_length=0,
             offset=RayCasterCfg.OffsetCfg(pos=(0.4, 0.0, 20.0)),
@@ -270,6 +275,11 @@ class G1VelocityDistillationEnvCfg_PLAY(G1RoughEnvCfg_PLAY):
         )
         self.terminations.base_contact = None
 
-        self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
-        self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
-        self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_x = (-0.0, 0.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (-0.0, 0.0)
+
+        # TODO collect 1e6 standing still
+        # TODO collect 5e6 random walking
+        # TODO train fql student
+        # TODO evaluate behaviour (should stop when no command given, walk when command given and not fall over (espcially not on flat terrain))

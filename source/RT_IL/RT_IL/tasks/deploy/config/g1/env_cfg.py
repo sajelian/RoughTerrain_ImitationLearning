@@ -40,6 +40,7 @@ class G1DeployEnvCfg(DeployEnvCfg):
         super().__post_init__()
 
         self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot.init_state.pos = (0.0, 0.0, 0.78)
         self.actions.joint_pos.scale = G1_HYBRID_ACTION_SCALE
         self.scene.obstacle = self.obstacle
 
@@ -48,4 +49,4 @@ class G1DeployEnvCfg(DeployEnvCfg):
         self.viewer.eye = (2.5, 2.5, 2.5)
         self.viewer.resolution = (1920, 1080)
         # Viz robot is optional — comment out if you don't want the ghost.
-        self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")
+        # self.scene.viz_robot = G1_VIZ_CFG.replace(prim_path="{ENV_REGEX_NS}/VizRobot")

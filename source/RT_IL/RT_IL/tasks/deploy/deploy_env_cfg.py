@@ -204,10 +204,7 @@ class RewardsCfg:
 @configclass
 class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
-    bad_orientation = DoneTerm(
-        func=mdp.bad_orientation,
-        params={"limit_angle": math.radians(60.0)},  # lenient — only fully tipped
-    )
+    bad_orientation = DoneTerm(func=mdp.bad_orientation, params={"limit_angle": 0.80})
 
 
 ##

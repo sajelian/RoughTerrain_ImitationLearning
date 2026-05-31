@@ -61,21 +61,19 @@ def inspect(path: str) -> dict | None:
     # Probe stats from a subsample to keep this fast over many files.
     n_probe = min(n, 100_000)
     idx = torch.randint(0, n, (n_probe,))
-    r_motion = float(data["rewards"][idx].float().mean())
-    r_cmd = float(data["rewards_cmd"][idx].float().mean()) if "rewards_cmd" in data else float("nan")
+    reward = float(data["rewards"][idx].float().mean())
     done_rate = float(data["dones"][idx].float().mean())
     return {
         "path": path,
         "n": n,
         "obs_dim": obs_dim,
         "action_dim": action_dim,
-        "r_motion": r_motion,
-        "r_cmd": r_cmd,
+        "reward": reward,
         "done_rate": done_rate,
+        "task": str(md.get("task", "?")),
         "usd": str(md.get("usd_name", "?")),
-        "registry": str(md.get("registry_name", "?")).split("/")[-1],
+        "registry": str(md.get("registry_name", "?")).split("/")[-1] if md.get("registry_name") else "-",
         "noise": float(md.get("action_noise_std", 0.0)),
-        "has_rewards_cmd": "rewards_cmd" in data,
     }
 
 
@@ -102,7 +100,7 @@ def main():
     name_w = max(len(os.path.basename(f)) for f in files)
     name_w = min(max(name_w, 12), 60)
     hdr = (f"{'file':<{name_w}}  {'N':>11}  {'obs':>4}  {'act':>3}  "
-           f"{'r_motion':>9}  {'r_cmd':>7}  {'done%':>6}  {'noise':>5}  {'cmd?':>4}  registry / usd")
+           f"{'reward':>8}  {'done%':>6}  {'noise':>5}  task / usd")
     print(hdr)
     print("-" * len(hdr))
     total_n = 0
@@ -118,12 +116,13 @@ def main():
         compat = (r["obs_dim"] == obs_dim_ref and r["action_dim"] == action_dim_ref)
         if not compat:
             incompat = True
-        rcmd = f"{r['r_cmd']:.3f}" if r["has_rewards_cmd"] else "  -  "
-        flag = "✓" if r["has_rewards_cmd"] else "✗"
         compat_mark = "" if compat else " !"
+        # Show task short name (last hyphen-segment) + USD when present.
+        task_short = r["task"].split("-")[-1] if r["task"] != "?" else r["registry"]
+        label = f"{task_short} / {r['usd']}" if r["usd"] != "?" else task_short
         print(f"{bn:<{name_w}}  {r['n']:>11,}  {r['obs_dim']:>4}  {r['action_dim']:>3}  "
-              f"{r['r_motion']:>+9.3f}  {rcmd:>7}  {100*r['done_rate']:>5.1f}%  "
-              f"{r['noise']:>5.2f}  {flag:>4}  {r['registry']} / {r['usd']}{compat_mark}")
+              f"{r['reward']:>+8.3f}  {100*r['done_rate']:>5.1f}%  "
+              f"{r['noise']:>5.2f}  {label}{compat_mark}")
         total_n += r["n"]
     print("-" * len(hdr))
     print(f"Total: {len(files)} file(s), {total_n:,} transitions  "
@@ -136,11 +135,6 @@ def main():
             sys.exit(2)
         else:
             print(f"\nWARNING: {msg}  (rerun with --check_compat to fail)")
-
-    n_missing_cmd = sum(1 for r in rows if not r.get("has_rewards_cmd", False) and "error" not in r)
-    if n_missing_cmd:
-        print(f"NOTE: {n_missing_cmd} file(s) have no 'rewards_cmd' field. "
-              "train_fql.py --reward_key rewards_cmd will fall back to motion reward on those.")
 
     if args.emit_args:
         good = [r["path"] for r in rows if "error" not in r]

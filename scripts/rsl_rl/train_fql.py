@@ -39,13 +39,6 @@ def parse_args():
                    help="Per-joint percentile to clip the action tail at "
                         "([pct, 100-pct]). Removes rare reactive transients that "
                         "poison the flow fit. 0 = no clipping.")
-    p.add_argument("--reward_key", type=str, default="rewards_cmd",
-                   choices=["rewards", "rewards_cmd"],
-                   help="Which reward field to optimize. 'rewards'=motion tracking "
-                        "(teacher's env reward, depends on hidden motion command). "
-                        "'rewards_cmd'=command velocity tracking (depends only on "
-                        "joystick + robot velocity; aligned with deploy objective).")
-
     # algorithm hyperparams (override defaults in FQLConfig)
     p.add_argument("--gamma", type=float, default=0.99,
                    help="Paper uses 0.995 for humanoid/giant tasks; try that if 0.99 plateaus.")
@@ -55,9 +48,7 @@ def parse_args():
     p.add_argument("--q_lr", type=float, default=3e-4)
     p.add_argument("--flow_integration_steps", type=int, default=10)
     p.add_argument("--alpha", type=float, default=3.0,
-                   help="BC coefficient (the paper's single major knob). "
-                        "Suggested: humanoid locomotion=30, contact-rich manipulation=300, "
-                        "dexterous=3000-30000. Sweep {30, 100, 300} for new tasks.")
+                   help="BC coefficient. With q_normalize on, the paper recommends trying {0.03, 0.1, 0.3, 1, 3, 10}; without it, alpha must be tuned to the reward scale (paper uses 100-30000).")
     p.add_argument("--q_normalize", action=argparse.BooleanOptionalAction, default=True,
                    help="Enable batch-wise 1/mean(|Q|) normalization in the actor loss "
                         "(paper App. B recommendation for new tasks). "
@@ -87,7 +78,7 @@ def main():
 
     # --- data ---
     buf = FQLReplayBuffer(paths=args.datasets, device=args.device, normalize_obs=True,
-                          action_clip_pct=args.action_clip_pct, reward_key=args.reward_key)
+                          action_clip_pct=args.action_clip_pct)
 
     # --- agent ---
     cfg = FQLConfig(
