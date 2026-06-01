@@ -22,6 +22,7 @@ from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import ContactSensorCfg
 from isaaclab.sensors.ray_caster import MultiMeshRayCasterCfg, RayCasterCfg, patterns
@@ -212,7 +213,8 @@ class TerminationsCfg:
 ##
 @configclass
 class EventCfg:
-    pass
+    reset_scene = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
+
 
 
 ##
@@ -230,7 +232,7 @@ class DeployEnvCfg(ManagerBasedRLEnvCfg):
 
     def __post_init__(self):
         self.decimation = 4
-        self.episode_length_s = 60.0  # long episodes — play is interactive
+        self.episode_length_s = 10.0  # long episodes — play is interactive
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation
         self.sim.disable_contact_processing = True
