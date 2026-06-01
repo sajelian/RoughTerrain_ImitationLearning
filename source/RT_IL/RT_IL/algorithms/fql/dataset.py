@@ -41,6 +41,7 @@ class FQLReplayBuffer:
         action_clip_pct: float = 0.5,
         chunk: int = 250_000,
         stat_samples: int = 1_000_000,
+        max_total_transitions: int | None = None,
     ):
         if isinstance(paths, str):
             paths = [paths]
@@ -62,7 +63,30 @@ class FQLReplayBuffer:
                 raise ValueError(f"obs_dim mismatch in {paths[fi]}")
             if data["actions"].shape[-1] != self.action_dim:
                 raise ValueError(f"action_dim mismatch in {paths[fi]}")
-        self.n = sum(sizes)
+        total = sum(sizes)
+
+        # If a RAM cap is set and total exceeds it, subsample each file
+        # proportionally so the union fits. Per-file uniform-random subset.
+        target_sizes: list[int]
+        per_file_idx: list[torch.Tensor | None]
+        if max_total_transitions is not None and total > max_total_transitions:
+            frac = max_total_transitions / total
+            target_sizes = [max(1, int(sz * frac)) for sz in sizes]
+            per_file_idx = []
+            for sz, tsz in zip(sizes, target_sizes):
+                if tsz == sz:
+                    per_file_idx.append(None)
+                else:
+                    # Random subset, then sort for sequential mmap reads
+                    idx = torch.randperm(sz)[:tsz]
+                    idx, _ = torch.sort(idx)
+                    per_file_idx.append(idx)
+            print(f"[FQL] Subsampling: {total:,} → {sum(target_sizes):,} transitions "
+                  f"({100*frac:.1f}% per file) to fit max_total_transitions={max_total_transitions:,}")
+        else:
+            target_sizes = sizes
+            per_file_idx = [None] * len(sizes)
+        self.n = sum(target_sizes)
 
         # Preallocate RAM-resident tensors (fp16 for the big ones).
         self.observations = torch.empty((self.n, self.obs_dim), dtype=torch.float16)
@@ -77,16 +101,30 @@ class FQLReplayBuffer:
         # that's the motion-tracking reward. Either way it's the natural
         # supervision signal for that data source's Q-learning objective.
         write = 0
-        for data, sz in zip(mmaps, sizes):
-            for lo in range(0, sz, chunk):
-                hi = min(lo + chunk, sz)
-                dst = slice(write + lo, write + hi)
-                self.observations[dst] = data["observations"][lo:hi].half()
-                self.next_observations[dst] = data["next_observations"][lo:hi].half()
-                self.actions[dst] = data["actions"][lo:hi].half()
-                self.rewards[dst] = data["rewards"][lo:hi].float()
-                self.dones[dst] = data["dones"][lo:hi].float()
-            write += sz
+        for data, tsz, idx in zip(mmaps, target_sizes, per_file_idx):
+            if idx is None:
+                # Full file, contiguous chunked read
+                for lo in range(0, tsz, chunk):
+                    hi = min(lo + chunk, tsz)
+                    dst = slice(write + lo, write + hi)
+                    self.observations[dst] = data["observations"][lo:hi].half()
+                    self.next_observations[dst] = data["next_observations"][lo:hi].half()
+                    self.actions[dst] = data["actions"][lo:hi].half()
+                    self.rewards[dst] = data["rewards"][lo:hi].float()
+                    self.dones[dst] = data["dones"][lo:hi].float()
+            else:
+                # Subsampled file, gather chunks of selected indices (sorted, so
+                # mostly-sequential disk access).
+                for lo in range(0, tsz, chunk):
+                    hi = min(lo + chunk, tsz)
+                    chunk_idx = idx[lo:hi]
+                    dst = slice(write + lo, write + hi)
+                    self.observations[dst] = data["observations"][chunk_idx].half()
+                    self.next_observations[dst] = data["next_observations"][chunk_idx].half()
+                    self.actions[dst] = data["actions"][chunk_idx].half()
+                    self.rewards[dst] = data["rewards"][chunk_idx].float()
+                    self.dones[dst] = data["dones"][chunk_idx].float()
+            write += tsz
         del mmaps  # release the memory maps
 
         self.device = torch.device(device)

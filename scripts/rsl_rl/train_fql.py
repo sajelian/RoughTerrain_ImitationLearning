@@ -39,6 +39,10 @@ def parse_args():
                    help="Per-joint percentile to clip the action tail at "
                         "([pct, 100-pct]). Removes rare reactive transients that "
                         "poison the flow fit. 0 = no clipping.")
+    p.add_argument("--max_total_transitions", type=int, default=None,
+                   help="If the union of --datasets exceeds this, each file is "
+                        "proportionally subsampled to fit. Bound this to your RAM: "
+                        "roughly 4 GB per million transitions for our 988-dim obs.")
     # algorithm hyperparams (override defaults in FQLConfig)
     p.add_argument("--gamma", type=float, default=0.99,
                    help="Paper uses 0.995 for humanoid/giant tasks; try that if 0.99 plateaus.")
@@ -78,7 +82,8 @@ def main():
 
     # --- data ---
     buf = FQLReplayBuffer(paths=args.datasets, device=args.device, normalize_obs=True,
-                          action_clip_pct=args.action_clip_pct)
+                          action_clip_pct=args.action_clip_pct,
+                          max_total_transitions=args.max_total_transitions)
 
     # --- agent ---
     cfg = FQLConfig(

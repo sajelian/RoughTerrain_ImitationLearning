@@ -21,11 +21,15 @@
 # Optional:
 #   MAX_ROUNDS              - default 3
 #   DAGGER_TRANSITIONS      - default 1_000_000 per round
-#   TRAIN_ITERATIONS        - default 500_000 per round
+#   TRAIN_ITERATIONS        - default 300_000 per round
 #   ALPHA                   - FQL BC coefficient, default 3.0
 #   DATA_DIR                - default data/fql_rollouts
 #   LOG_DIR                 - default logs/fql/dagger
 #   TASK                    - default Velocity-G1-v0 (env for DAgger collection)
+#   REGISTRY_NAME           - W&B motion artifact (required for tracking-env tasks,
+#                             e.g. sajelian-eth-zurich-org/wandb-registry-Motions/box_up)
+#   USD_NAME                - obstacle USD name (for tracking-env tasks, e.g. flat_box_convex)
+#   TEACHER_CFG             - 'ppo' (default, tracking PPO) or 'ppo_velocity'
 #
 # Usage:
 #   PPO_WANDB_PATH=user/project/runid \
@@ -37,12 +41,16 @@ set -euo pipefail
 # ---- Config ----
 MAX_ROUNDS="${MAX_ROUNDS:-3}"
 DAGGER_TRANSITIONS="${DAGGER_TRANSITIONS:-1000000}"
-TRAIN_ITERATIONS="${TRAIN_ITERATIONS:-500000}"
+TRAIN_ITERATIONS="${TRAIN_ITERATIONS:-300000}"
 ALPHA="${ALPHA:-3.0}"
 DATA_DIR="${DATA_DIR:-data/fql_rollouts}"
 LOG_DIR="${LOG_DIR:-logs/fql/dagger}"
 TASK="${TASK:-Velocity-G1-v0}"
 NUM_ENVS="${NUM_ENVS:-2048}"
+# RAM cap for the FQL replay buffer (proportional subsampling across all
+# datasets if exceeded). Rough budget: 4 GB per 1M transitions @ obs_dim≈988.
+# Default 10M ≈ 40 GB — adjust to your machine.
+MAX_TOTAL_TRANSITIONS="${MAX_TOTAL_TRANSITIONS:-10000000}"
 
 # Required
 if [[ -z "${PPO_WANDB_PATH:-}" ]]; then
@@ -81,6 +89,18 @@ for ROUND in $(seq 1 "$MAX_ROUNDS"); do
     DAGGER_FILE="$DATA_DIR/${DAGGER_NAME}.pt"
 
     echo ">>> Step 1/2: Collecting DAgger data..."
+    # Optional args for tracking envs (motion clip + obstacle USD)
+    EXTRA_COLLECT_ARGS=()
+    if [[ -n "${REGISTRY_NAME:-}" ]]; then
+        EXTRA_COLLECT_ARGS+=(--registry_name "$REGISTRY_NAME")
+    fi
+    if [[ -n "${USD_NAME:-}" ]]; then
+        EXTRA_COLLECT_ARGS+=(--usd_name "$USD_NAME")
+    fi
+    if [[ -n "${TEACHER_CFG:-}" ]]; then
+        EXTRA_COLLECT_ARGS+=(--teacher_cfg "$TEACHER_CFG")
+    fi
+
     python scripts/rsl_rl/collect_dagger_dataset.py \
         --task "$TASK" \
         --wandb_path "$PPO_WANDB_PATH" \
@@ -89,6 +109,7 @@ for ROUND in $(seq 1 "$MAX_ROUNDS"); do
         --output_name "$DAGGER_NAME" \
         --num_envs "$NUM_ENVS" \
         --num_transitions "$DAGGER_TRANSITIONS" \
+        "${EXTRA_COLLECT_ARGS[@]}" \
         --headless
 
     if [[ ! -f "$DAGGER_FILE" ]]; then
@@ -111,6 +132,7 @@ for ROUND in $(seq 1 "$MAX_ROUNDS"); do
         --datasets "${ALL_DATA[@]}" \
         --alpha "$ALPHA" \
         --num_iterations "$TRAIN_ITERATIONS" \
+        --max_total_transitions "$MAX_TOTAL_TRANSITIONS" \
         --output_dir "$ROUND_OUT" \
         --wandb \
         --wandb_name "dagger_round_${ROUND}"

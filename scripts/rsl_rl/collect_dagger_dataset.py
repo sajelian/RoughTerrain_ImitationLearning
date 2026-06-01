@@ -38,6 +38,8 @@ import sys
 from isaaclab.app import AppLauncher
 
 import cli_args  # isort: skip
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from usd_utils import load_usd_config  # isort: skip
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--disable_fabric", action="store_true", default=False)
@@ -67,6 +69,11 @@ parser.add_argument("--use_flow", action="store_true",
 parser.add_argument("--reset_on_fall", action="store_true", default=True,
                     help="Rely on env's bad_orientation termination to reset fallen "
                          "robots (default). Disable only if you want fallen-robot data.")
+parser.add_argument("--registry_name", type=str, default=None,
+                    help="W&B motion artifact name (required for tracking envs with a "
+                         "MotionCommand term; omit for velocity envs).")
+parser.add_argument("--usd_name", type=str, default=None,
+                    help="Obstacle USD name. Omit for envs without an obstacle prim.")
 cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
@@ -75,9 +82,15 @@ sys.argv = [sys.argv[0]] + hydra_args
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
+if args_cli.usd_name:
+    usd_path, usd_cfg = load_usd_config(args_cli.usd_name)
+else:
+    usd_path, usd_cfg = None, {}
+
 
 import gymnasium as gym
 import importlib.metadata as metadata
+import pathlib
 import time
 import torch
 
@@ -131,6 +144,36 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
         log_root_path = os.path.abspath(os.path.join("logs", "rsl_rl", agent_cfg.experiment_name))
         ppo_resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
         print(f"[INFO] PPO checkpoint (local): {ppo_resume_path}")
+
+    # --- Resolve motion file from W&B registry (tracking envs need it) ---
+    if args_cli.registry_name is not None and hasattr(env_cfg.commands, "motion"):
+        import wandb
+        api_motion = wandb.Api()
+        registry_name = args_cli.registry_name
+        if ":" not in registry_name:
+            registry_name += ":latest"
+        artifact = api_motion.artifact(registry_name)
+        env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
+        print(f"[INFO] Motion file resolved from W&B: {env_cfg.commands.motion.motion_file}")
+    elif hasattr(env_cfg.commands, "motion"):
+        raise ValueError(
+            "Env has a `motion` command term but --registry_name was not provided. "
+            "Tracking envs require a motion artifact."
+        )
+
+    # --- Substitute obstacle USD if the env has one and a USD was given ---
+    if usd_path is not None and getattr(env_cfg.scene, "obstacle", None) is not None:
+        env_cfg.scene.obstacle = env_cfg.scene.obstacle.replace(
+            spawn=env_cfg.scene.obstacle.spawn.replace(
+                usd_path=usd_path,
+                scale=tuple(usd_cfg.get("scale", (1.0, 1.0, 1.0))),
+            ),
+            init_state=env_cfg.scene.obstacle.init_state.replace(
+                pos=tuple(usd_cfg.get("translation", (0.0, 0.0, 0.0))),
+                rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
+            ),
+        )
+        print(f"[INFO] Obstacle USD: {usd_path}")
 
     # --- Env ---
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode=None)

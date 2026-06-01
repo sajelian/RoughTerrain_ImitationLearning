@@ -719,7 +719,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 4
-        self.episode_length_s = 4.0  # this should be <= clip length
+        self.episode_length_s = 10.0  # this should be <= clip length
         # simulation settings
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation

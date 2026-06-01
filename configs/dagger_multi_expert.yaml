@@ -1,0 +1,63 @@
+# Multi-expert DAgger orchestrator config.
+# Run with:
+#   python scripts/dagger_orchestrator.py --config configs/dagger_multi_expert.yaml
+#
+# Resume from a specific round (e.g. if a previous run was interrupted):
+#   python scripts/dagger_orchestrator.py --config configs/dagger_multi_expert.yaml --start_round 3
+#
+# The orchestrator skips any (round, expert) where the output .pt file already
+# exists, so killing and re-running is safe.
+
+# Each entry produces one DAgger collection per round:
+#   data/fql_rollouts/dagger_round_{N}_{name}.pt
+experts:
+  # ── Locomotion: velocity tracking on rough terrain ─────────────────────
+  - name: velocity
+    task: Velocity-G1-v0
+    wandb_path: sajelian-eth-z-rich/RT_IL_Velocity/REPLACE_WITH_RUN_ID
+    usd_name: null                # no obstacle prim in the velocity env
+    teacher_cfg: ppo_velocity     # uses G1VelocityPPORunnerCfg
+    transitions: 1_000_000
+
+  # ── Idle / standing-still on box terrain (to anchor stand-still mode) ──
+  - name: idle_box
+    task: Tracking-Mesh-G1-Joystick-Distillation-v0
+    wandb_path: sajelian-eth-z-rich/RT_IL/REPLACE_IDLE_RUN_ID
+    usd_name: flat_box_convex
+    registry_name: sajelian-eth-zurich-org/wandb-registry-Motions/idle
+    teacher_cfg: ppo
+    transitions: 500_000
+
+  # ── Dynamic skill: box_up ─────────────────────────────────────────────
+  - name: box_up
+    task: Tracking-Mesh-G1-Joystick-Distillation-v0
+    wandb_path: sajelian-eth-z-rich/RT_IL/REPLACE_BOXUP_RUN_ID
+    usd_name: flat_box_convex
+    registry_name: sajelian-eth-zurich-org/wandb-registry-Motions/box_up
+    teacher_cfg: ppo
+    transitions: 500_000
+
+  # ── Add more skill experts as you train them ──────────────────────────
+  # - name: beam_up
+  #   task: Tracking-Mesh-G1-Joystick-Distillation-v0
+  #   wandb_path: ...
+  #   usd_name: beam_v1
+  #   registry_name: sajelian-eth-zurich-org/wandb-registry-Motions/beam_up
+  #   teacher_cfg: ppo
+  #   transitions: 500_000
+
+# Loop-level parameters (all optional; defaults are sensible).
+loop:
+  max_rounds: 3
+  initial_fql_checkpoint: logs/fql/baseline/agent_500000.pt   # REPLACE with your starting FQL
+  data_dir: data/fql_rollouts
+  log_dir: logs/fql/dagger_multi
+  train_iterations: 300_000
+  alpha: 3.0
+  # RAM cap for the union — proportional subsampling kicks in above this.
+  # Rough budget: 4 GB per 1M transitions @ obs_dim≈988.
+  max_total_transitions: 10_000_000
+  num_envs: 2048
+  headless: true
+  wandb: true
+  wandb_project: RT_IL_FQL

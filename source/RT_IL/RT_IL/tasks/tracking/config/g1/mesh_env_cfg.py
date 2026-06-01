@@ -311,5 +311,5 @@ class G1MeshEnvCfg_JOYSTICK_DISTILLATIONPLAY(G1MeshEnvCfg_JOYSTICK_DISTILLATION)
         # for skill_mode=0 (velocity-tracking from keyboard joystick).
         self.observations.student.skill_mode = ObsTerm(
             func=mdp.skill_mode_keyboard,
-            params={"key": "SPACE"},
+            params={"key": "V"},
         )
