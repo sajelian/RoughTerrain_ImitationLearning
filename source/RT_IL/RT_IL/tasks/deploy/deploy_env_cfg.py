@@ -144,13 +144,13 @@ class ObservationsCfg:
                 "forward_speed": 0.8,
                 "turn_slow": 0.785,
                 "turn_fast": 1.571,
-                "skill_key": "SPACE",
+                "skill_key": "V",
             },
             history_length=PROPIO_HISTORY_SHORT,
         )
         skill_mode = ObsTerm(
             func=mdp.deploy_skill_mode,
-            params={"key": "SPACE"},
+            params={"key": "V"},
         )
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel,

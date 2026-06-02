@@ -19,12 +19,17 @@ for compatibility with our existing FQL collection pipeline:
 
 from __future__ import annotations
 
+import isaaclab.sim as sim_utils
+from isaaclab.assets import AssetBaseCfg
+from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors.ray_caster import MultiMeshRayCasterCfg, RayCasterCfg, patterns
+from isaaclab.terrains import TerrainGeneratorCfg, TerrainImporterCfg
+import isaaclab.terrains as terrain_gen
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
@@ -246,10 +251,127 @@ class G1VelocityDistillationEnvCfg(G1RoughEnvCfg):
         # self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
         # self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
         # self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
-        # self.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.0)
-        # self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
-        # self.commands.base_velocity.ranges.ang_vel_z = (-0.0, 0.0)
+        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (-0.0, 0.0) 
 
+
+@configclass
+class G1VelocityObstacleEnvCfg(G1VelocityDistillationEnvCfg):
+    """Velocity-tracking env with an obstacle prim — used to collect velocity-PPO
+    rollouts on the *same spatial layout* the skill experts were trained on.
+
+    Key differences from the parent:
+      * Flat terrain (replaces ROUGH_TERRAINS_CFG). The skill experts were
+        trained on flat ground + obstacle; matching their distribution at
+        collection time means the student gets coherent obs across both
+        skill_mode=0 (this env) and skill_mode=1 (tracking env) data sources.
+      * Adds an `obstacle` AssetBaseCfg prim with the same swap mechanism as
+        the tracking env's G1MeshEnvCfg (play_fql.py / collect scripts use
+        `--usd_name` to set the USD at runtime).
+      * Height scanner now ray-casts against the obstacle too, so the obstacle
+        shows up in the student's heightmap obs.
+      * Reset event swapped: instead of random base pose, robot spawns at the
+        motion clip's first-frame anchor pose. The collect script wires the
+        motion file into `events.reset_base.params['motion_file']` from the
+        same `--registry_name` it uses for the tracking env's MotionCommand.
+    """
+
+    obstacle = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/obstacle",
+        spawn=sim_utils.UsdFileCfg(
+            usd_path="",  # filled at runtime via --usd_name
+            scale=(1.0, 1.0, 1.0),
+            visual_material=sim_utils.materials.PreviewSurfaceCfg(
+                diffuse_color=(0.2, 0.2, 0.2),
+                emissive_color=(0.0, 0.0, 0.0),
+                roughness=0.5,
+                metallic=0.5,
+                opacity=1.0,
+            ),
+        ),
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0)
+        ),
+        collision_group=0,
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        # --- Replace rough terrain with flat (match skill expert's training) ---
+        self.scene.terrain = TerrainImporterCfg(
+            prim_path="/World/ground",
+            terrain_type="generator",
+            terrain_generator=TerrainGeneratorCfg(
+                size=(100.0, 100.0),
+                num_rows=1,
+                num_cols=1,
+                border_width=0.0,
+                sub_terrains={"flat": terrain_gen.MeshPlaneTerrainCfg()},
+            ),
+            use_terrain_origins=False,
+            collision_group=-1,
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                friction_combine_mode="multiply",
+                restitution_combine_mode="multiply",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+            ),
+            debug_vis=False,
+        )
+
+        # --- Attach obstacle + extend height scanner to ray-cast it ---
+        self.scene.obstacle = self.obstacle
+        self.scene.height_scanner = MultiMeshRayCasterCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/torso_link",
+            history_length=0,
+            offset=RayCasterCfg.OffsetCfg(pos=(0.4, 0.0, 20.0)),
+            ray_alignment="yaw",
+            pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[1.2, 0.6]),
+            debug_vis=False,
+            mesh_prim_paths=[
+                "/World/ground",
+                MultiMeshRayCasterCfg.RaycastTargetCfg(
+                    prim_expr="{ENV_REGEX_NS}/obstacle",
+                    is_shared=True,
+                    track_mesh_transforms=False,
+                ),
+            ],
+            update_period=self.decimation * self.sim.dt,
+        )
+
+        # --- Swap reset event: write only the root pose from motion frame 0 ---
+        # The parent's `reset_robot_joints` event still runs and sets joints to
+        # the default standing pose with noise (untouched).
+        from dataclasses import MISSING as _MISSING
+        self.events.reset_base = EventTerm(
+            func=mdp.reset_root_to_motion_first_frame,
+            mode="reset",
+            params={
+                "motion_file": _MISSING,
+                "anchor_body": "pelvis",  # root link, NOT torso
+                "pose_range": {
+                    "x": (-0.05, 0.05),
+                    "y": (-0.05, 0.05),
+                    "z": (0.0, 0.02),
+                    "roll": (-0.05, 0.05),
+                    "pitch": (-0.05, 0.05),
+                    "yaw": (-0.1, 0.1),
+                },
+            },
+        )
+
+        # --- Disable curriculum that requires rough-terrain levels ---
+        # The parent inherits LocomotionVelocityRoughEnvCfg.CurriculumCfg which
+        # has terrain_levels = CurrTerm(func=mdp.terrain_levels_vel). Our flat
+        # terrain has no terrain_levels attribute, so the curriculum would crash
+        # at the first reset.
+        if hasattr(self, "curriculum") and self.curriculum is not None:
+            self.curriculum.terrain_levels = None  # type: ignore[attr-defined]
+
+        self.scene.env_spacing = 3.5
+        self.episode_length_s = 2.0
 
 @configclass
 class G1VelocityDistillationEnvCfg_PLAY(G1RoughEnvCfg_PLAY):

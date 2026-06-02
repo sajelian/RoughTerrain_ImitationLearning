@@ -77,15 +77,19 @@ from RT_IL.algorithms.fql import FQLAgent, FQLConfig
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _agent_cfg):
     env_cfg.scene.num_envs = args_cli.num_envs
 
-    # Motion file — only when the env actually has a motion command term
-    # (legacy tracking play envs). Deploy-G1-v0 doesn't have one.
-    if args_cli.registry_name is not None and hasattr(env_cfg.commands, "motion"):
+    # Motion file — resolve from W&B regardless of whether the env has a motion
+    # command (Deploy-G1-v0 doesn't, but we may still use it for obstacle
+    # auto-alignment below).
+    motion_file_path: str | None = None
+    if args_cli.registry_name is not None:
         import wandb
         import pathlib as _pathlib
         api = wandb.Api()
         reg = args_cli.registry_name if ":" in args_cli.registry_name else args_cli.registry_name + ":latest"
         artifact = api.artifact(reg)
-        env_cfg.commands.motion.motion_file = str(_pathlib.Path(artifact.download()) / "motion.npz")
+        motion_file_path = str(_pathlib.Path(artifact.download()) / "motion.npz")
+        if hasattr(env_cfg.commands, "motion"):
+            env_cfg.commands.motion.motion_file = motion_file_path
 
     # Obstacle USD swap — only if both the env has an obstacle prim and a USD was given.
     if usd_path is not None and getattr(env_cfg.scene, "obstacle", None) is not None:

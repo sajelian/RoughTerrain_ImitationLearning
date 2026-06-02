@@ -37,10 +37,12 @@ parser.add_argument("--num_envs", type=int, default=4096,
                     help="Number of parallel envs for rollout (higher = faster collection).")
 parser.add_argument("--task", type=str, default="Tracking-Mesh-G1-Joystick-Distillation-v0",
                     help="Env task id. Must expose both 'policy' and 'student' obs groups.")
-parser.add_argument("--teacher_cfg", type=str, default="ppo", choices=["ppo", "ppo_deploy"],
+parser.add_argument("--teacher_cfg", type=str, default="ppo",
+                    choices=["ppo", "ppo_deploy", "ppo_velocity"],
                     help="Which PPO runner cfg matches the teacher's training. "
                          "'ppo' = G1MeshPPORunnerCfg ([512,256,128]); "
-                         "'ppo_deploy' = G1MeshPPODeployRunnerCfg ([1024,512,256,128]).")
+                         "'ppo_deploy' = G1MeshPPODeployRunnerCfg ([1024,512,256,128]); "
+                         "'ppo_velocity' = G1VelocityPPORunnerCfg (for Velocity-G1 envs).")
 parser.add_argument("--registry_name", type=str, default=None,
                     help="W&B motion artifact name (required for motion-tracking envs; "
                          "omit for velocity-tracking envs that have no motion command).")
@@ -94,13 +96,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
     # the teacher reads obs["policy"] (motion command), not obs["student"] (joystick).
     # Override with the PPO cfg so the runner builds a network with obs_groups
     # {"actor": ["policy"], "critic": ["critic"]} matching the teacher's training.
-    from RT_IL.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import (
-        G1MeshPPODeployRunnerCfg,
-        G1MeshPPORunnerCfg,
-    )
-    if args_cli.teacher_cfg == "ppo_deploy":
+    if args_cli.teacher_cfg == "ppo_velocity":
+        from RT_IL.tasks.velocity.config.g1.agents.rsl_rl_ppo_cfg import G1VelocityPPORunnerCfg
+        agent_cfg = G1VelocityPPORunnerCfg()
+    elif args_cli.teacher_cfg == "ppo_deploy":
+        from RT_IL.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import G1MeshPPODeployRunnerCfg
         agent_cfg = G1MeshPPODeployRunnerCfg()
     else:
+        from RT_IL.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import G1MeshPPORunnerCfg
         agent_cfg = G1MeshPPORunnerCfg()
     # Honour the standard CLI overrides (resume path, run name, etc.) the same way
     # parse_rsl_rl_cfg would for the PPO task.
@@ -131,19 +134,35 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
         resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
         print(f"[INFO] Teacher checkpoint: {resume_path}")
 
-    # Resolve motion file from W&B registry — only if this env has a motion command.
-    if args_cli.registry_name is not None and hasattr(env_cfg.commands, "motion"):
+    # Resolve motion file from W&B registry — used by tracking envs (commands.motion)
+    # AND by the velocity-obstacle env (events.reset_base.params['motion_file']).
+    motion_file_path: str | None = None
+    if args_cli.registry_name is not None:
         import wandb
         api = wandb.Api()
         registry_name = args_cli.registry_name
         if ":" not in registry_name:
             registry_name += ":latest"
         artifact = api.artifact(registry_name)
-        env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
-    elif hasattr(env_cfg.commands, "motion"):
+        motion_file_path = str(pathlib.Path(artifact.download()) / "motion.npz")
+
+    motion_command = getattr(env_cfg.commands, "motion", None)
+    reset_event = getattr(env_cfg.events, "reset_base", None)
+    event_needs_motion = (
+        reset_event is not None
+        and hasattr(reset_event, "params")
+        and "motion_file" in (reset_event.params or {})
+    )
+    env_needs_motion = (motion_command is not None) or event_needs_motion
+    if env_needs_motion and motion_file_path is None:
         raise ValueError(
-            "Env has a `motion` command term but --registry_name was not provided."
+            "Env requires a motion file (commands.motion or events.reset_base) "
+            "but --registry_name was not provided."
         )
+    if motion_command is not None and motion_file_path is not None:
+        motion_command.motion_file = motion_file_path
+    if event_needs_motion and motion_file_path is not None:
+        reset_event.params["motion_file"] = motion_file_path
 
     # Substitute obstacle USD — only if both the env has an obstacle prim and a USD was given.
     if usd_path is not None and getattr(env_cfg.scene, "obstacle", None) is not None:
@@ -157,6 +176,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
                 rot=tuple(usd_cfg.get("rotation", (1.0, 0.0, 0.0, 0.0))),
             ),
         )
+
+    # Spatial alignment is handled by the motion clip itself: the obstacle is
+    # placed at usd_translation (+ env_origin per env) by IsaacLab, and the
+    # reset event places the robot at motion's first-frame anchor (+ env_origin).
+    # The relative pose between robot and box is therefore byte-for-byte the
+    # same as the recording, regardless of which env_origin each env has.
+    # Use a no-offset USD (translation=(0,0,0), rotation=identity) so the box
+    # lives at the recording's world origin.
 
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode=None)
     if isinstance(env.unwrapped, DirectMARLEnv):

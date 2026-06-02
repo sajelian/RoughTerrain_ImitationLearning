@@ -145,21 +145,36 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
         ppo_resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
         print(f"[INFO] PPO checkpoint (local): {ppo_resume_path}")
 
-    # --- Resolve motion file from W&B registry (tracking envs need it) ---
-    if args_cli.registry_name is not None and hasattr(env_cfg.commands, "motion"):
+    # --- Resolve motion file from W&B registry (tracking envs + velocity-obstacle env need it) ---
+    motion_file_path: str | None = None
+    if args_cli.registry_name is not None:
         import wandb
         api_motion = wandb.Api()
         registry_name = args_cli.registry_name
         if ":" not in registry_name:
             registry_name += ":latest"
         artifact = api_motion.artifact(registry_name)
-        env_cfg.commands.motion.motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
-        print(f"[INFO] Motion file resolved from W&B: {env_cfg.commands.motion.motion_file}")
-    elif hasattr(env_cfg.commands, "motion"):
+        motion_file_path = str(pathlib.Path(artifact.download()) / "motion.npz")
+        print(f"[INFO] Motion file resolved from W&B: {motion_file_path}")
+
+    # Wire it into wherever the env consumes it.
+    motion_command = getattr(env_cfg.commands, "motion", None)
+    reset_event = getattr(env_cfg.events, "reset_base", None)
+    event_needs_motion = (
+        reset_event is not None
+        and hasattr(reset_event, "params")
+        and "motion_file" in (reset_event.params or {})
+    )
+    env_needs_motion = (motion_command is not None) or event_needs_motion
+    if env_needs_motion and motion_file_path is None:
         raise ValueError(
-            "Env has a `motion` command term but --registry_name was not provided. "
-            "Tracking envs require a motion artifact."
+            "Env requires a motion file (commands.motion or events.reset_base) "
+            "but --registry_name was not provided."
         )
+    if motion_command is not None and motion_file_path is not None:
+        motion_command.motion_file = motion_file_path
+    if event_needs_motion and motion_file_path is not None:
+        reset_event.params["motion_file"] = motion_file_path
 
     # --- Substitute obstacle USD if the env has one and a USD was given ---
     if usd_path is not None and getattr(env_cfg.scene, "obstacle", None) is not None:
@@ -174,6 +189,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
             ),
         )
         print(f"[INFO] Obstacle USD: {usd_path}")
+
+    # Spatial alignment is handled by the motion clip + reset event (see
+    # collect_fql_dataset.py for the full reasoning). Use a no-offset USD.
 
     # --- Env ---
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode=None)
