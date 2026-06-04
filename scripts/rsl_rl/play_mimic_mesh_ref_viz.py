@@ -26,6 +26,13 @@ parser.add_argument("--registry_name", type=str, required=True, help="The name o
 parser.add_argument(
     "--usd_name", type=str, default=None, help="Name of the USD mesh."
 )
+parser.add_argument(
+    "--difficulty",
+    type=float,
+    default=None,
+    help="Freeze the robustness curriculum at this difficulty in [0, 1] for eval "
+    "(1.0 = full spawn randomization + loosened terminations the policy trained against).",
+)
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -84,6 +91,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     """Play with RSL-RL agent."""
     agent_cfg: RslRlOnPolicyRunnerCfg = cli_args.parse_rsl_rl_cfg(args_cli.task, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
+
+    # override the robustness curriculum difficulty for eval (recover-from-randomization tests)
+    if args_cli.difficulty is not None:
+        robustness = getattr(getattr(env_cfg, "curriculum", None), "robustness", None)
+        if robustness is not None:
+            robustness.params["start_difficulty"] = args_cli.difficulty
+            robustness.params["freeze"] = True
+            print(f"[INFO] Robustness curriculum frozen at difficulty={args_cli.difficulty}")
+        else:
+            print("[WARN] --difficulty given but this env has no robustness curriculum term; ignoring.")
 
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)

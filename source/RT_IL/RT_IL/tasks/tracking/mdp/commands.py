@@ -124,6 +124,24 @@ class MotionCommand(CommandTerm):
         self.motion = MotionLoader(
             self.cfg.motion_file, self.cfg.body_names, self.body_indexes, device=self.device
         )
+
+        # Auto-size the episode to the clip. Playback consumes one motion frame per env step,
+        # so the clip lasts `time_step_total * step_dt` seconds (NOT frames/fps, which only
+        # matches if the file is sampled at the control rate). If episode_length_s is shorter,
+        # a from-the-start spawn times out before the final-10% goal window is ever reachable
+        # — completion stays 0 and the curriculum silently stalls. The clip length is only
+        # known after the motion loads, and motion_file is often injected at runtime after
+        # cfg __post_init__, so this is the correct place to set it.
+        if self.cfg.auto_episode_length:
+            step_dt = env.cfg.decimation * env.cfg.sim.dt
+            clip_length_s = self.motion.time_step_total * step_dt
+            if abs(env.cfg.episode_length_s - clip_length_s) > 1e-6:
+                print(
+                    f"[MotionCommand] episode_length_s {env.cfg.episode_length_s:.2f}s -> "
+                    f"{clip_length_s:.2f}s to match clip ({self.motion.time_step_total} frames)."
+                )
+            env.cfg.episode_length_s = clip_length_s
+
         if self.motion.rsi_mask is not None:
             self._valid_rsi_indices = torch.where(self.motion.rsi_mask)[0]
             assert len(self._valid_rsi_indices) > 0, "No valid RSI frames in motion data!"
@@ -142,6 +160,19 @@ class MotionCommand(CommandTerm):
         )
         self.kernel = self.kernel / self.kernel.sum()
 
+        # --- robustness curriculum: motion-completion tracking ---
+        # The goal window is the final `success_final_fraction` of the clip. For most
+        # obstacle motions the reference is spatially meaningful there (e.g. "Box Up"
+        # stands still on the box), so reaching it = completing the task regardless of
+        # where the robot was spawned. We only score completion for envs that started
+        # early enough to have actually traversed the clip (see `success_start_fraction`).
+        total = self.motion.time_step_total
+        self._goal_window_start = int((1.0 - self.cfg.success_final_fraction) * total)
+        self._success_start_max = int(self.cfg.success_start_fraction * total)
+        self._reached_goal = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+        self._episode_start_step = torch.full((self.num_envs,), -1, dtype=torch.long, device=self.device)
+        self.completion_rate = 0.0  # scalar EMA over completed episodes, read by the curriculum
+
         self.metrics["error_anchor_pos"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["error_anchor_rot"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["error_anchor_lin_vel"] = torch.zeros(self.num_envs, device=self.device)
@@ -153,6 +184,7 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_entropy"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["sampling_top1_prob"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["sampling_top1_bin"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["completion_rate"] = torch.zeros(self.num_envs, device=self.device)
 
     @property
     def command(self) -> torch.Tensor:
@@ -276,6 +308,43 @@ class MotionCommand(CommandTerm):
         self.metrics["error_joint_pos"] = torch.norm(self.joint_pos - self.robot_joint_pos, dim=-1)
         self.metrics["error_joint_vel"] = torch.norm(self.joint_vel - self.robot_joint_vel, dim=-1)
 
+        self.metrics["completion_rate"][:] = self.completion_rate
+
+    def reset(self, env_ids: Sequence[int] | None = None) -> dict[str, float]:
+        """True per-episode reset hook (timeout / termination), distinct from clip looping.
+
+        Natural clip-wrap re-randomizes the RSI start mid-episode via ``_resample_command``
+        but is *not* an episode boundary, so completion is scored here instead: record the
+        just-ended episode's goal-reached flag, then arm the trackers for the fresh episode.
+        """
+        if env_ids is None:
+            env_ids = slice(None)
+        ids = (
+            torch.arange(self.num_envs, device=self.device) if isinstance(env_ids, slice) else env_ids
+        )
+        self._record_completion(ids)
+        extras = super().reset(env_ids)  # logs metrics + resamples a new episode start
+        self._reached_goal[ids] = False
+        self._episode_start_step[ids] = self.time_steps[ids]
+        return extras
+
+    def _record_completion(self, env_ids: torch.Tensor):
+        """Fold the just-ended episodes' goal-reached flags into the completion EMA.
+
+        Only episodes that *started* within ``success_start_fraction`` of the clip count,
+        so a trivially-late RSI spawn beginning inside the goal window cannot inflate the
+        metric — this measures "completed from a randomized start", which is the robustness
+        signal the curriculum gates on.
+        """
+        if len(env_ids) == 0:
+            return
+        start = self._episode_start_step[env_ids]
+        eligible = (start >= 0) & (start <= self._success_start_max)
+        if eligible.any():
+            reached = self._reached_goal[env_ids][eligible].float().mean().item()
+            a = self.cfg.completion_ema
+            self.completion_rate = (1.0 - a) * self.completion_rate + a * reached
+
     def _adaptive_sampling(self, env_ids: Sequence[int]):
         episode_failed = self._env.termination_manager.terminated[env_ids]
         if torch.any(episode_failed):
@@ -395,6 +464,15 @@ class MotionCommand(CommandTerm):
         )
         self._current_bin_failed.zero_()
 
+        # --- goal-window tracking for the robustness curriculum ---
+        # Latch "reached goal" once the anchor is within tolerance of the reference
+        # while inside the final goal window. Absolute world-frame error (xyz) so the
+        # signal stays tied to the obstacle/mesh, not to a re-anchored relative target.
+        in_window = self.time_steps >= self._goal_window_start
+        if in_window.any():
+            anchor_err = torch.norm(self.anchor_pos_w - self.robot_anchor_pos_w, dim=-1)
+            self._reached_goal |= in_window & (anchor_err < self.cfg.success_pos_threshold)
+
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
             if not hasattr(self, "current_anchor_visualizer"):
@@ -468,6 +546,28 @@ class MotionCommandCfg(CommandTermCfg):
     adaptive_alpha: float = 0.001
 
     start_xy_noise_std: float = 0.0
+
+    auto_episode_length: bool = True
+    """If True, set env.episode_length_s to the clip's playback duration when the motion loads.
+
+    Playback consumes one motion frame per env step, so the clip lasts
+    ``time_step_total * decimation * sim.dt`` seconds. A shorter episode makes the final-10%
+    goal window unreachable from an early spawn (completion stays 0, the curriculum stalls).
+    Set False to keep a manually-tuned episode_length_s."""
+
+    # --- robustness curriculum: motion-completion tracking ---
+    success_final_fraction: float = 0.1
+    """Final fraction of the clip treated as the goal window (spatially meaningful end pose)."""
+    success_pos_threshold: float = 0.30
+    """Absolute anchor xyz error (m) below which an env counts as having reached the goal."""
+    success_start_fraction: float = 0.1
+    """Only envs starting before this fraction of the clip contribute to ``completion_rate``.
+
+    Aligned with the spawn xy-noise window in ``_resample_command`` so the metric tracks
+    exactly the randomized-start envs we want robust — i.e. "can it complete from a
+    randomized spawn", not "can it finish from a trivial near-the-end RSI point"."""
+    completion_ema: float = 0.02
+    """EMA coefficient for the running completion rate read by the curriculum."""
 
     anchor_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/pose")
     anchor_visualizer_cfg.markers["frame"].scale = (0.2, 0.2, 0.2)

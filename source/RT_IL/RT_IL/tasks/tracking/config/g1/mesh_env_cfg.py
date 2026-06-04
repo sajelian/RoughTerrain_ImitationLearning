@@ -51,6 +51,11 @@ def _configure_play_viewer(cfg) -> None:
     cfg.viewer.eye = (2.5, 2.5, 2.5)
     cfg.viewer.resolution = (1920, 1080)
     cfg.commands.motion.class_type = FixedStartMotionCommand
+    # Hold the robustness curriculum fixed during eval. Set start_difficulty to inspect a
+    # given difficulty (e.g. 1.0 for full randomization); 0.0 reproduces the base config.
+    if getattr(cfg.curriculum, "robustness", None) is not None:
+        cfg.curriculum.robustness.params["freeze"] = True
+        cfg.curriculum.robustness.params["start_difficulty"] = 0.0
 
 
 class FixedStartMotionCommand(MotionCommand):
@@ -121,7 +126,6 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         #self.terminations.ee_feet_pos = None
         #self.terminations.ee_hand_pos = None
         #self.events.push_robot = None
-        # self.commands.motion.start_xy_noise_std = 0.0
         # self.episode_length_s = 7.0  # some motions are longer than default 10s
 
 
@@ -139,6 +143,11 @@ class G1MeshEnvDeployCfg(G1MeshEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
+
+        # Deploy keeps its own hand-tuned, fixed sim-to-real randomization below, so the
+        # robustness curriculum (which would override start_xy_noise_std / pose_range /
+        # termination thresholds at runtime) is disabled here.
+        self.curriculum.robustness = None
 
         self.scene.height_scanner = _noised_mesh_scanner(
             resolution=0.05, size=[0.5, 0.8]  # flipped dimension for sideways beam
@@ -244,6 +253,9 @@ class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
         # post init of parent
         super().__post_init__()
 
+        # Distillation collects from a fixed teacher distribution; don't ramp difficulty here.
+        self.curriculum.robustness = None
+
         self.scene.height_scanner = _noised_mesh_scanner(
             resolution=0.1, size=[1.6, 1.0]
         )
@@ -283,6 +295,11 @@ class G1MeshEnvCfg_JOYSTICK_DISTILLATION(G1MeshEnvCfg):
     """
 
     observations: ObservationsCfg_JOYSTICK_DISTILLATION = ObservationsCfg_JOYSTICK_DISTILLATION()
+
+    def __post_init__(self):
+        super().__post_init__()
+        # Fixed teacher distribution for distillation; don't ramp difficulty here.
+        self.curriculum.robustness = None
 
 
 @configclass

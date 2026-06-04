@@ -29,6 +29,25 @@ def motion_global_anchor_orientation_error_exp(env: ManagerBasedRLEnv, command_n
     return torch.exp(-error / std**2)
 
 
+def motion_terminal_anchor_goal(
+    env: ManagerBasedRLEnv, command_name: str, std: float, final_fraction: float = 0.1
+) -> torch.Tensor:
+    """Sparse-in-time "success" reward: match the absolute anchor pose in the goal window.
+
+    Fires only during the final ``final_fraction`` of the clip, where the reference is
+    spatially meaningful (e.g. standing on the box / past the obstacle). Because the
+    error is absolute world-frame xyz, this rewards *arriving at the goal location* even
+    if the robot needed an extra adjustment step and is slightly behind schedule — for
+    "stand still at the end" clips the target stays put while the robot catches up. This
+    is the term the robustness curriculum ramps up to pay for the adjustment step.
+    """
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    window_start = int((1.0 - final_fraction) * command.motion.time_step_total)
+    in_window = (command.time_steps >= window_start).float()
+    error = torch.sum(torch.square(command.anchor_pos_w - command.robot_anchor_pos_w), dim=-1)
+    return torch.exp(-error / std**2) * in_window
+
+
 def motion_relative_body_position_error_exp(
     env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
 ) -> torch.Tensor:

@@ -601,7 +601,13 @@ class RewardsCfg:
         weight=0.5,
         params={"command_name": "motion", "std": 0.4},
     )
-    # body tracking 
+    # task success (ramped up by the robustness curriculum; 0 at difficulty 0)
+    motion_terminal_goal = RewTerm(
+        func=mdp.motion_terminal_anchor_goal,
+        weight=0.0,
+        params={"command_name": "motion", "std": 0.25, "final_fraction": 0.1},
+    )
+    # body tracking
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_error_exp,
         weight=1.0,
@@ -693,7 +699,39 @@ class TerminationsCfg:
 class CurriculumCfg:
     """Curriculum terms for the MDP."""
 
-    pass
+    # Metric-driven robustness curriculum. Difficulty d in [0, 1] ramps spawn
+    # randomization + termination slack + the terminal goal reward together, advancing
+    # only when the motion-completion rate is high and backing off if it collapses.
+    # Easy endpoints (first value of each tuple) reproduce the base config at d=0.
+    robustness = CurrTerm(
+        func=mdp.robustness_curriculum,
+        params={
+            "command_name": "motion",
+            "start_difficulty": 0.0,
+            "freeze": False,
+            # advancement gating (steps are env.common_step_counter / policy steps)
+            "warmup_steps": 500,
+            "cooldown_steps": 1500,
+            "advance_threshold": 0.8,
+            "backoff_threshold": 0.5,
+            "difficulty_step": 0.05,
+            "backoff_step": 0.05,
+            # manager term names this curriculum mutates
+            "anchor_term": "anchor_pos",
+            "feet_term": "ee_feet_pos",
+            "success_reward": "motion_terminal_goal",
+            "foot_contact_reward": "foot_contact_schedule",
+            "feet_pos_reward": "motion_global_feet_body_pos",
+            # (easy, hard) endpoints
+            "start_xy_noise_std": (0.10, 0.40),
+            "pose_yaw": (0.10, 0.50),
+            "anchor_threshold_xy": (0.35, 0.85),
+            "feet_threshold_xy": (0.35, 0.60),
+            "success_weight": (0.0, 2.0),
+            "foot_contact_weight": (2.0, 1.0),
+            "feet_pos_weight": (1.0, 0.5),
+        },
+    )
 
 
 ##
@@ -719,7 +757,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 4
-        self.episode_length_s = 10.0  # this should be <= clip length
+        self.episode_length_s = 16.0  # this should be >= clip length otherwise curriculum doesnt work
         # simulation settings
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation
