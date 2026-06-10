@@ -165,10 +165,10 @@ class MotionCommand(CommandTerm):
         # obstacle motions the reference is spatially meaningful there (e.g. "Box Up"
         # stands still on the box), so reaching it = completing the task regardless of
         # where the robot was spawned. We only score completion for envs that started
-        # early enough to have actually traversed the clip (see `success_start_fraction`).
+        # early enough to have actually traversed the clip (see `start_window_fraction`).
         total = self.motion.time_step_total
         self._goal_window_start = int((1.0 - self.cfg.success_final_fraction) * total)
-        self._success_start_max = int(self.cfg.success_start_fraction * total)
+        self._start_window_max = int(self.cfg.start_window_fraction * total)
         self._reached_goal = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         self._episode_start_step = torch.full((self.num_envs,), -1, dtype=torch.long, device=self.device)
         self.completion_rate = 0.0  # scalar EMA over completed episodes, read by the curriculum
@@ -331,7 +331,7 @@ class MotionCommand(CommandTerm):
     def _record_completion(self, env_ids: torch.Tensor):
         """Fold the just-ended episodes' goal-reached flags into the completion EMA.
 
-        Only episodes that *started* within ``success_start_fraction`` of the clip count,
+        Only episodes that *started* within ``start_window_fraction`` of the clip count,
         so a trivially-late RSI spawn beginning inside the goal window cannot inflate the
         metric — this measures "completed from a randomized start", which is the robustness
         signal the curriculum gates on.
@@ -339,7 +339,7 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             return
         start = self._episode_start_step[env_ids]
-        eligible = (start >= 0) & (start <= self._success_start_max)
+        eligible = (start >= 0) & (start <= self._start_window_max)
         if eligible.any():
             reached = self._reached_goal[env_ids][eligible].float().mean().item()
             a = self.cfg.completion_ema
@@ -415,7 +415,7 @@ class MotionCommand(CommandTerm):
         rand_samples = sample_uniform(ranges[:, 0], ranges[:, 1], (len(env_ids), 6), device=self.device)
         root_pos[env_ids] += rand_samples[:, 0:3]
         if self.cfg.start_xy_noise_std > 0.0:
-            early_mask = self.time_steps[env_ids] < int(0.1 * self.motion.time_step_total)
+            early_mask = self.time_steps[env_ids] < self._start_window_max
             if early_mask.any():
                 xy_noise = (torch.rand(int(early_mask.sum()), 2, device=self.device) * 2 - 1) * self.cfg.start_xy_noise_std
                 root_pos[env_ids[early_mask], :2] += xy_noise
@@ -560,12 +560,17 @@ class MotionCommandCfg(CommandTermCfg):
     """Final fraction of the clip treated as the goal window (spatially meaningful end pose)."""
     success_pos_threshold: float = 0.30
     """Absolute anchor xyz error (m) below which an env counts as having reached the goal."""
-    success_start_fraction: float = 0.1
-    """Only envs starting before this fraction of the clip contribute to ``completion_rate``.
+    start_window_fraction: float = 0.1
+    """Fraction of the clip considered an "early/start" spawn. Governs two coupled things:
 
-    Aligned with the spawn xy-noise window in ``_resample_command`` so the metric tracks
-    exactly the randomized-start envs we want robust — i.e. "can it complete from a
-    randomized spawn", not "can it finish from a trivial near-the-end RSI point"."""
+    1. Where spawn xy-noise is applied (``_resample_command``): only spawns landing in this
+       opening window get randomized — randomizing a mid-clip RSI start makes no sense.
+    2. Which episodes count toward ``completion_rate``: only those that *started* in this
+       window, so the metric measures "can it complete from a randomized spawn", not "can
+       it finish from a trivial near-the-end RSI point".
+
+    These are one knob because they must agree — widen the noise window and the metric must
+    count the same envs, or it silently mis-measures robustness."""
     completion_ema: float = 0.02
     """EMA coefficient for the running completion rate read by the curriculum."""
 

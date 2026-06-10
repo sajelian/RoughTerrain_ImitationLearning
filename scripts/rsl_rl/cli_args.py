@@ -36,6 +36,37 @@ def add_rsl_rl_args(parser: argparse.ArgumentParser):
     )
 
 
+def add_difficulty_arg(parser: argparse.ArgumentParser):
+    """Add the ``--difficulty`` flag for freezing the robustness curriculum during eval/collection."""
+    parser.add_argument(
+        "--difficulty",
+        type=float,
+        default=None,
+        help="Freeze the robustness curriculum at this difficulty in [0, 1] "
+        "(1.0 = full spawn randomization + loosened terminations the expert trained against). "
+        "No-op for envs without the curriculum.",
+    )
+
+
+def apply_difficulty_override(env_cfg, difficulty: float | None) -> float | None:
+    """Freeze the robustness curriculum at a fixed difficulty, if the env has one.
+
+    Reuses the exact same knobs (spawn randomization, termination slack, reward weights)
+    the policy trained against, so collected rollouts match the expert's envelope. Returns
+    the resolved difficulty (or None if no override / no curriculum), for logging.
+    """
+    if difficulty is None:
+        return None
+    robustness = getattr(getattr(env_cfg, "curriculum", None), "robustness", None)
+    if robustness is None:
+        print("[WARN] --difficulty given but this env has no robustness curriculum term; ignoring.")
+        return None
+    robustness.params["start_difficulty"] = difficulty
+    robustness.params["freeze"] = True
+    print(f"[INFO] Robustness curriculum frozen at difficulty={difficulty}")
+    return difficulty
+
+
 def parse_rsl_rl_cfg(task_name: str, args_cli: argparse.Namespace) -> RslRlOnPolicyRunnerCfg:
     """Parse configuration for RSL-RL agent based on inputs.
 

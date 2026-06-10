@@ -57,6 +57,7 @@ parser.add_argument("--output_dir", type=str, default="data/fql_rollouts",
                     help="Directory to write the dataset file into.")
 parser.add_argument("--output_name", type=str, default=None,
                     help="Output file stem (defaults to <registry>_<usd>).")
+cli_args.add_difficulty_arg(parser)
 cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
@@ -109,6 +110,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
     # parse_rsl_rl_cfg would for the PPO task.
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs
+    cli_args.apply_difficulty_override(env_cfg, args_cli.difficulty)
     print(f"[INFO] Runner cfg: {type(agent_cfg).__name__}  "
           f"obs_groups={getattr(agent_cfg, 'obs_groups', '?')}")
 

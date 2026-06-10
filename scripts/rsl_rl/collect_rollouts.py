@@ -27,6 +27,7 @@ parser.add_argument(
     "--usd_name", type=str, default=None, help="Name of the USD mesh."
 )
 # append RSL-RL cli arguments
+cli_args.add_difficulty_arg(parser)
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -87,6 +88,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     """Play with RSL-RL agent."""
     agent_cfg: RslRlOnPolicyRunnerCfg = cli_args.parse_rsl_rl_cfg(args_cli.task, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
+    cli_args.apply_difficulty_override(env_cfg, args_cli.difficulty)
 
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)

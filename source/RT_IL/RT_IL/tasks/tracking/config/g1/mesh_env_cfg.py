@@ -253,8 +253,11 @@ class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
         # post init of parent
         super().__post_init__()
 
-        # Distillation collects from a fixed teacher distribution; don't ramp difficulty here.
-        self.curriculum.robustness = None
+        # Keep the curriculum present but frozen (no ramping during distillation/collection).
+        # Default difficulty 0.0 == base config; collection scripts dial it via --difficulty
+        # (e.g. 1.0) so rollouts carry the same spawn randomization the expert trained against.
+        self.curriculum.robustness.params["freeze"] = True
+        self.curriculum.robustness.params["start_difficulty"] = 0.0
 
         self.scene.height_scanner = _noised_mesh_scanner(
             resolution=0.1, size=[1.6, 1.0]
@@ -298,8 +301,10 @@ class G1MeshEnvCfg_JOYSTICK_DISTILLATION(G1MeshEnvCfg):
 
     def __post_init__(self):
         super().__post_init__()
-        # Fixed teacher distribution for distillation; don't ramp difficulty here.
-        self.curriculum.robustness = None
+        # Frozen (no ramping during distillation/collection); collection dials it via
+        # --difficulty so rollouts carry the expert's spawn randomization. 0.0 == base.
+        self.curriculum.robustness.params["freeze"] = True
+        self.curriculum.robustness.params["start_difficulty"] = 0.0
 
 
 @configclass

@@ -74,6 +74,7 @@ parser.add_argument("--registry_name", type=str, default=None,
                          "MotionCommand term; omit for velocity envs).")
 parser.add_argument("--usd_name", type=str, default=None,
                     help="Obstacle USD name. Omit for envs without an obstacle prim.")
+cli_args.add_difficulty_arg(parser)
 cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
@@ -122,6 +123,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
         agent_cfg = G1MeshPPORunnerCfg()
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs
+    cli_args.apply_difficulty_override(env_cfg, args_cli.difficulty)
     print(f"[INFO] Teacher cfg: {type(agent_cfg).__name__}  obs_groups={agent_cfg.obs_groups}")
 
     # --- Resolve PPO checkpoint (wandb_path or local) ---
