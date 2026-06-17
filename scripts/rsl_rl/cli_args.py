@@ -67,6 +67,42 @@ def apply_difficulty_override(env_cfg, difficulty: float | None) -> float | None
     return difficulty
 
 
+def add_skill_mode_arg(parser: argparse.ArgumentParser):
+    """Add the ``--skill_mode`` flag for overriding the skill-mode bit during collection."""
+    parser.add_argument(
+        "--skill_mode",
+        type=float,
+        default=None,
+        help="Override the constant skill-mode bit written into the student obs "
+        "(0.0 = velocity/locomotion regime, 1.0 = terrain-driven skill regime). "
+        "Default: leave the env cfg's value untouched (1.0 for the joystick-distillation "
+        "env, 0.0 for the velocity env). Set 0.0 to collect a tracking expert "
+        "(e.g. idle / stand-still) as velocity-regime data.",
+    )
+
+
+def apply_skill_mode_override(env_cfg, skill_mode: float | None) -> float | None:
+    """Override the constant skill-mode bit in the student obs group, if present.
+
+    The student obs carries a 1-bit skill_mode that disambiguates 'follow the velocity
+    command' (0) from 'engage a terrain-driven skill' (1). Each data source is collected
+    with a single fixed value. Most experts use the env-cfg default, but a stand-still /
+    idle tracking expert belongs in the velocity regime (skill_mode=0, joystick=0), so its
+    collection overrides the joystick-distillation env's default of 1.0. Returns the
+    resolved value (or None if no override / no such term), for logging.
+    """
+    if skill_mode is None:
+        return None
+    student = getattr(getattr(env_cfg, "observations", None), "student", None)
+    term = getattr(student, "skill_mode", None)
+    if term is None or not hasattr(term, "params"):
+        print("[WARN] --skill_mode given but this env's student obs has no skill_mode term; ignoring.")
+        return None
+    term.params["value"] = skill_mode
+    print(f"[INFO] skill_mode bit overridden to {skill_mode}")
+    return skill_mode
+
+
 def parse_rsl_rl_cfg(task_name: str, args_cli: argparse.Namespace) -> RslRlOnPolicyRunnerCfg:
     """Parse configuration for RSL-RL agent based on inputs.
 

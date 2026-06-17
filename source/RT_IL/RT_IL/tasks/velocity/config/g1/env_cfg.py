@@ -251,9 +251,9 @@ class G1VelocityDistillationEnvCfg(G1RoughEnvCfg):
         # self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
         # self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
         # self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
-        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.0)
-        self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
-        self.commands.base_velocity.ranges.ang_vel_z = (-0.0, 0.0) 
+        # self.commands.base_velocity.ranges.lin_vel_x = (0.8, 0.8)
+        # self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
+        # self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
 
 
 @configclass

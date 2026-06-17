@@ -48,6 +48,11 @@ class ExpertCfg:
     registry_name: str | None = None         # W&B motion artifact (None for velocity env)
     teacher_cfg: str = "ppo"                 # "ppo" or "ppo_velocity"
     transitions: int = 1_000_000             # data quantity per round for this expert
+    skill_mode: float | None = None          # override the student-obs skill bit (0=velocity regime,
+                                             # 1=skill regime); None = use the env cfg default
+    difficulty: float | None = None          # freeze the robustness curriculum at this difficulty
+                                             # (1.0 = full spawn randomization the expert trained
+                                             # against); None = env cfg default (no override)
     extra_args: list[str] = field(default_factory=list)  # passed through to collect script
 
 
@@ -209,6 +214,10 @@ def collect_one_expert(
         cmd.extend(["--usd_name", expert.usd_name])
     if expert.registry_name:
         cmd.extend(["--registry_name", expert.registry_name])
+    if expert.skill_mode is not None:
+        cmd.extend(["--skill_mode", str(expert.skill_mode)])
+    if expert.difficulty is not None:
+        cmd.extend(["--difficulty", str(expert.difficulty)])
     if loop.headless:
         cmd.append("--headless")
     cmd.extend(expert.extra_args)

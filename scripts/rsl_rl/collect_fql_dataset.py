@@ -58,6 +58,7 @@ parser.add_argument("--output_dir", type=str, default="data/fql_rollouts",
 parser.add_argument("--output_name", type=str, default=None,
                     help="Output file stem (defaults to <registry>_<usd>).")
 cli_args.add_difficulty_arg(parser)
+cli_args.add_skill_mode_arg(parser)
 cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
@@ -111,6 +112,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs
     cli_args.apply_difficulty_override(env_cfg, args_cli.difficulty)
+    cli_args.apply_skill_mode_override(env_cfg, args_cli.skill_mode)
     print(f"[INFO] Runner cfg: {type(agent_cfg).__name__}  "
           f"obs_groups={getattr(agent_cfg, 'obs_groups', '?')}")
 
@@ -226,9 +228,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, _age
 
     # Plain CPU tensors (no pin_memory) — pinned pages exhaust the CUDA-pinned pool
     # at multi-GB buffer sizes while sim is still running on the GPU.
-    obs_buf = torch.empty((capacity, student_dim), dtype=torch.float32, device="cpu")
-    next_obs_buf = torch.empty((capacity, student_dim), dtype=torch.float32, device="cpu")
-    action_buf = torch.empty((capacity, action_dim), dtype=torch.float32, device="cpu")
+    # obs/next_obs/actions are stored fp16: they are normalized NN inputs / joint
+    # targets where 3 decimal digits is plenty, and fp16 halves both the collection
+    # RAM footprint and the on-disk file size (the replay buffer consumes them as
+    # fp16 anyway). copy_ casts fp32->fp16 on the way in. Rewards stay fp32 so the
+    # Q-learning target keeps full precision.
+    obs_buf = torch.empty((capacity, student_dim), dtype=torch.float16, device="cpu")
+    next_obs_buf = torch.empty((capacity, student_dim), dtype=torch.float16, device="cpu")
+    action_buf = torch.empty((capacity, action_dim), dtype=torch.float16, device="cpu")
     reward_buf = torch.empty((capacity,), dtype=torch.float32, device="cpu")
     done_buf = torch.empty((capacity,), dtype=torch.bool, device="cpu")
 

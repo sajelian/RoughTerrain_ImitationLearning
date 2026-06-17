@@ -232,7 +232,7 @@ class DeployEnvCfg(ManagerBasedRLEnvCfg):
 
     def __post_init__(self):
         self.decimation = 4
-        self.episode_length_s = 10.0  # long episodes — play is interactive
+        self.episode_length_s = 40.0  # long episodes — play is interactive
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation
         self.sim.disable_contact_processing = True

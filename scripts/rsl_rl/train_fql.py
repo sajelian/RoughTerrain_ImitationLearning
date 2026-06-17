@@ -42,7 +42,13 @@ def parse_args():
     p.add_argument("--max_total_transitions", type=int, default=None,
                    help="If the union of --datasets exceeds this, each file is "
                         "proportionally subsampled to fit. Bound this to your RAM: "
-                        "roughly 4 GB per million transitions for our 988-dim obs.")
+                        "roughly 2 GB per million transitions (fp16) for our ~988-dim obs.")
+    p.add_argument("--keep_on_disk", action="store_true",
+                   help="Stream batches straight from the memory-mapped dataset files "
+                        "instead of loading them into RAM. Removes the RAM ceiling "
+                        "entirely (train on the full union regardless of size, and keep "
+                        "RAM free for online/DAgger data) at the cost of disk-bound "
+                        "sampling. Ignores --max_total_transitions.")
     # algorithm hyperparams (override defaults in FQLConfig)
     p.add_argument("--gamma", type=float, default=0.99,
                    help="Paper uses 0.995 for humanoid/giant tasks; try that if 0.99 plateaus.")
@@ -83,7 +89,8 @@ def main():
     # --- data ---
     buf = FQLReplayBuffer(paths=args.datasets, device=args.device, normalize_obs=True,
                           action_clip_pct=args.action_clip_pct,
-                          max_total_transitions=args.max_total_transitions)
+                          max_total_transitions=args.max_total_transitions,
+                          keep_on_disk=args.keep_on_disk)
 
     # --- agent ---
     cfg = FQLConfig(

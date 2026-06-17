@@ -302,7 +302,7 @@ class G1MeshEnvCfg_JOYSTICK_DISTILLATION(G1MeshEnvCfg):
     def __post_init__(self):
         super().__post_init__()
         # Frozen (no ramping during distillation/collection); collection dials it via
-        # --difficulty so rollouts carry the expert's spawn randomization. 0.0 == base.
+        # --difficulty (e.g. the dagger YAML's per-expert `difficulty`). 0.0 == base.
         self.curriculum.robustness.params["freeze"] = True
         self.curriculum.robustness.params["start_difficulty"] = 0.0
 

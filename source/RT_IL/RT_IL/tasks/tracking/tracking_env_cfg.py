@@ -471,7 +471,10 @@ class ObservationsCfg_JOYSTICK_DISTILLATION(ObservationsCfg_TRAIN):
         )
         skill_mode = ObsTerm(
             func=mdp.skill_mode_constant,
-            params={"value": 1.0},   # skill-expert data
+            # Default for skill-expert data (terrain-driven skill regime). Override per
+            # collection with `--skill_mode` (e.g. 0.0 for an idle / stand-still expert,
+            # which belongs in the velocity regime alongside joystick=0).
+            params={"value": 1.0},
         )
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel,
