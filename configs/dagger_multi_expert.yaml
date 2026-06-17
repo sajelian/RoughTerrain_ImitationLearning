@@ -14,28 +14,34 @@ experts:
   # ── Locomotion: velocity tracking on rough terrain ─────────────────────
   - name: velocity
     task: Velocity-G1-v0
-    wandb_path: sajelian-eth-z-rich/RT_IL_Velocity/REPLACE_WITH_RUN_ID
+    wandb_path: sajelian-eth-z-rich/RT_IL_Velocity/hfd4tjf6
     usd_name: null                # no obstacle prim in the velocity env
     teacher_cfg: ppo_velocity     # uses G1VelocityPPORunnerCfg
-    transitions: 1_000_000
+    transitions: 500_000
 
   # ── Idle / standing-still on box terrain (to anchor stand-still mode) ──
-  - name: idle_box
-    task: Tracking-Mesh-G1-Joystick-Distillation-v0
-    wandb_path: sajelian-eth-z-rich/RT_IL/REPLACE_IDLE_RUN_ID
-    usd_name: flat_box_convex
-    registry_name: sajelian-eth-zurich-org/wandb-registry-Motions/idle
-    teacher_cfg: ppo
-    transitions: 500_000
+  # The idle expert is a tracking expert, but stand-still belongs in the
+  # VELOCITY regime: skill_mode=0 + joystick=0 (the deploy state when the user
+  # gives no command and engages no skill). skill_mode: 0.0 overrides the
+  # joystick-distillation env's default of 1.0 so this data lands there.
+  # - name: idle_box
+  #   task: Tracking-Mesh-G1-Joystick-Distillation-v0
+  #   wandb_path: sajelian-eth-z-rich/RT_IL/wjsj5mm1
+  #   usd_name: flat_box_convex
+  #   registry_name: sajelian-eth-zurich-org/wandb-registry-Motions/idle
+  #   teacher_cfg: ppo
+  #   skill_mode: 0.0
+  #   transitions: 500_000
 
   # ── Dynamic skill: box_up ─────────────────────────────────────────────
   - name: box_up
     task: Tracking-Mesh-G1-Joystick-Distillation-v0
-    wandb_path: sajelian-eth-z-rich/RT_IL/REPLACE_BOXUP_RUN_ID
+    wandb_path: sajelian-eth-z-rich/RT_IL/wjsj5mm1
     usd_name: flat_box_convex
     registry_name: sajelian-eth-zurich-org/wandb-registry-Motions/box_up
     teacher_cfg: ppo
-    transitions: 500_000
+    difficulty: 1.0               # freeze robustness curriculum here -> rollouts get full spawn randomization
+    transitions: 1_000_000
 
   # ── Add more skill experts as you train them ──────────────────────────
   # - name: beam_up
@@ -49,15 +55,15 @@ experts:
 # Loop-level parameters (all optional; defaults are sensible).
 loop:
   max_rounds: 3
-  initial_fql_checkpoint: logs/fql/baseline/agent_500000.pt   # REPLACE with your starting FQL
-  data_dir: data/fql_rollouts
-  log_dir: logs/fql/dagger_multi
+  initial_fql_checkpoint: logs/fql/upol_v4/agent_200000.pt   # REPLACE with your starting FQL
+  data_dir: data/fql_rollouts/
+  log_dir: logs/fql/upol_v4_dagger
   train_iterations: 300_000
   alpha: 3.0
   # RAM cap for the union — proportional subsampling kicks in above this.
   # Rough budget: 4 GB per 1M transitions @ obs_dim≈988.
-  max_total_transitions: 10_000_000
-  num_envs: 2048
+  max_total_transitions: 3_000_000
+  num_envs: 8192
   headless: true
   wandb: true
   wandb_project: RT_IL_FQL
