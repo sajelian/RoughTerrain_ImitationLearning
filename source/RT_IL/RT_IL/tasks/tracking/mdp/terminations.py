@@ -15,11 +15,7 @@ from RT_IL.tasks.tracking.mdp.commands import MotionCommand
 from RT_IL.tasks.tracking.mdp.rewards import _get_body_indexes
 
 
-# def bad_anchor_pos(env: ManagerBasedRLEnv, command_name: str, threshold: float) -> torch.Tensor:
-#     command: MotionCommand = env.command_manager.get_term(command_name)
-#     return torch.norm(command.anchor_pos_w - command.robot_anchor_pos_w, dim=1) > threshold
-
-def bad_anchor_pos(env: ManagerBasedRLEnv, command_name: str, 
+def bad_anchor_pos(env: ManagerBasedRLEnv, command_name: str,
                    threshold_xy: float, threshold_z: float) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     diff = command.anchor_pos_w - command.robot_anchor_pos_w

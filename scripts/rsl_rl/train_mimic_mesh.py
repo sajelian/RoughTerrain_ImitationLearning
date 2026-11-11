@@ -4,7 +4,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """Script to train mimic task agent on mesh terrain.
-python scripts/rsl_rl/train_mimic_mesh.py --registry_name=sajelian-eth-zurich-org/wandb-registry-Motions/sequence_07_z0 --usd_name sequence_07_fix --num_envs 2048 --headless --video --video_interval 7500 --logger wandb --log_project_name RT_IL
+
+Example:
+    python scripts/rsl_rl/train_mimic_mesh.py \\
+        --registry_name <wandb-entity>/wandb-registry-Motions/<motion_name> \\
+        --usd_name <usd_mesh_name> --num_envs 2048 --headless \\
+        --video --video_interval 7500 --logger wandb --log_project_name RT_IL
 """
 
 """Launch Isaac Sim Simulator first."""
@@ -82,7 +87,7 @@ installed_version = metadata.version("rsl-rl-lib")
 
 # Import extensions to set up environment tasks
 import RT_IL.tasks  # noqa: F401
-from RT_IL.utils.my_on_policy_runner import MotionDistillationRunner, MotionOnPolicyRunner
+from RT_IL.utils.my_on_policy_runner import MotionOnPolicyRunner
 
 
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -168,18 +173,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
 
     # create runner from rsl-rl
-    if agent_cfg.class_name == "DistillationRunner":
-        runner = MotionDistillationRunner(
-            env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device, registry_name=registry_name
-        )
-    else:
-        runner = MotionOnPolicyRunner(
-            env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device, registry_name=registry_name
-        )
+    runner = MotionOnPolicyRunner(
+        env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device, registry_name=registry_name
+    )
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
-    # load checkpoint: always required for distillation (to load teacher), optional otherwise
-    if agent_cfg.resume or agent_cfg.class_name == "DistillationRunner":
+    # load checkpoint to resume training, if requested
+    if agent_cfg.resume:
         resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         runner.load(resume_path)

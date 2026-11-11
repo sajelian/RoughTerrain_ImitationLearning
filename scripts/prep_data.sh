@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Resolve paths relative to this script so the repo can live anywhere / be renamed.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # <repo>/scripts
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"                  # <repo>
+
 # ---------------- user config ----------------
-VENV_ISAACLAB="${HOME}/RT_IL/env_isaaclab"
+VENV_ISAACLAB="${REPO_ROOT}/env_isaaclab"
 ENV_GMR="gmr_custom"
-VENV_MESH="${HOME}/RT_IL/env_isaaclab" # was mesh but they dont really differ
 
 # External GMR repo script
 GMR_REPO="${GMR_REPO:-${HOME}/GMR}"
 SMPLX_TO_G1_SH="${GMR_REPO}/scripts/smplx_to_g1_csv.sh"
 
 # Mesh conversion tool (IsaacLab)
-CONVERT_MESH_PY="source/RT_IL/RT_IL/utils/convert_mesh.py"
+CONVERT_MESH_PY="${REPO_ROOT}/source/RT_IL/RT_IL/utils/convert_mesh.py"
 # --------------------------------------------
 
 usage() {
@@ -26,10 +29,13 @@ Behavior:
   - By default, intermediate files are created in a temp dir and deleted on exit.
   - With --keep-intermediate, intermediates are written to --out-dir and preserved.
 
+  - --mesh is optional: if omitted, the terrain mesh embedded in the motion npz is used.
+  - --skip-mesh skips the terrain pipeline entirely (trajectory output only).
+
 Trajectory output (always in --out-dir):
   <stem>_rt2g1_rdy.csv
 
-Mesh outputs (if --mesh is provided and not --skip-mesh):
+Mesh outputs (unless --skip-mesh):
   data/terrains/prepared/obj/<stem>_<meshname>_cropped.obj
   <mesh-out-dir>/<stem>_<meshname>_cropped/<stem>_<meshname>_cropped.usd (defaults to data/terrains/prepared)
 EOF
@@ -47,7 +53,8 @@ KEEP_INTERMEDIATE=0
 MESH_OBJ=""
 MESH_OUT_DIR="data/terrains/prepared"
 CROPPED_OBJ_DIR="data/terrains/prepared/obj"
-MESH_CUT_SCRIPT="${HOME}/RT_IL/scripts/terrain/mesh_traj_cut.py"
+MESH_CUT_SCRIPT="${SCRIPT_DIR}/terrain/mesh_traj_cut.py"
+EXTRACT_MESH_SCRIPT="${SCRIPT_DIR}/terrain/extract_mesh.py"
 SKIP_MESH=0
 
 while [[ $# -gt 0 ]]; do
@@ -132,14 +139,6 @@ run_in_gmr() {
   )
 }
 
-# Helper: run a command in mesh venv, isolated in a subshell
-run_in_mesh() {
-  (
-    source "${VENV_MESH}/bin/activate"
-    "$@"
-  )
-}
-
 # ---- 1) prepare_data.py (env_isaaclab + IsaacLab setup) ----
 echo "== Step 1: prepare_data.py (isaaclab) =="
 FRAME_RANGE_FLAG=""
@@ -183,11 +182,24 @@ else
   FINAL_RDY_CSV="${OUT_DIR}/$(basename "${RDY_CSV}")"
 fi
 
-# ---- Optional mesh pipeline (mesh env -> cropped OBJ, then isaaclab -> USD) ----
-if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
-  [[ -f "${MESH_OBJ}" ]] || { echo "Missing mesh file: ${MESH_OBJ}" >&2; exit 1; }
+# ---- Optional mesh pipeline (extract/cut OBJ in mesh env, then isaaclab -> USD) ----
+if [[ "${SKIP_MESH}" -eq 0 ]]; then
   [[ -f "${MESH_CUT_SCRIPT}" ]] || { echo "Missing mesh cut script: ${MESH_CUT_SCRIPT}" >&2; exit 1; }
   [[ -f "${CONVERT_MESH_PY}" ]] || { echo "Missing convert_mesh.py: ${CONVERT_MESH_PY}" >&2; exit 1; }
+
+  # If no mesh was provided, extract the terrain embedded in the motion npz.
+  if [[ -z "${MESH_OBJ}" ]]; then
+    [[ -f "${EXTRACT_MESH_SCRIPT}" ]] || { echo "Missing extract_mesh.py: ${EXTRACT_MESH_SCRIPT}" >&2; exit 1; }
+    MESH_OBJ="${WORK_DIR}/${STEM}_terrain.obj"
+    echo
+    echo "== Step 3b: extract_mesh.py (isaaclab) =="
+    echo "Motion NPZ     : ${MOTION_NPZ}"
+    echo "Terrain OBJ    : ${MESH_OBJ}"
+    run_in_isaaclab python "${EXTRACT_MESH_SCRIPT}" \
+      --motion-npz "${MOTION_NPZ}" \
+      --output-obj "${MESH_OBJ}"
+  fi
+  [[ -f "${MESH_OBJ}" ]] || { echo "Missing mesh file: ${MESH_OBJ}" >&2; exit 1; }
 
   if [[ -z "${MESH_OUT_DIR}" ]]; then
     MESH_OUT_DIR="${OUT_DIR}"
@@ -205,11 +217,11 @@ if [[ "${SKIP_MESH}" -eq 0 && -n "${MESH_OBJ}" ]]; then
   CROPPED_OBJ="${CROPPED_OBJ_DIR}/${motion_name}_${terrain_name}_cropped.obj"
 
   echo
-  echo "== Step 4: mesh_traj_cut.py (mesh env) =="
+  echo "== Step 4: mesh_traj_cut.py (isaaclab) =="
   echo "Trajectory CSV : ${FINAL_RDY_CSV}"
   echo "Mesh OBJ       : ${MESH_OBJ}"
   echo "Cropped OBJ    : ${CROPPED_OBJ}"
-  run_in_mesh python "${MESH_CUT_SCRIPT}" \
+  run_in_isaaclab python "${MESH_CUT_SCRIPT}" \
     --trajectory "${FINAL_RDY_CSV}" \
     --mesh "${MESH_OBJ}" \
     --leica-z "${LEICA_Z}" \

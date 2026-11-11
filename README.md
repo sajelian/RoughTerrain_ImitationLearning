@@ -17,7 +17,18 @@
 
 ## Overview
 
-This repository implements motion tracking over rough terrains for a Unitree G1 robot using feature-based imitation learning. (It acts as the expert-policy collection subcomponent of the HumanoidRTT framework. TBD)
+This repository implements motion tracking over rough terrains for a Unitree G1 robot
+using feature-based imitation learning.
+
+The full workflow is a four-stage pipeline. Each stage consumes the output of the
+previous one:
+
+| Stage | Script | In → Out |
+| --- | --- | --- |
+| 1. Data preparation | `scripts/prep_data.sh` | raw motion `.npz` → retargeted trajectory `.csv` + terrain `.usd` |
+| 2. Motion packaging | `scripts/csv_to_npz_terrain.py` | trajectory `.csv` (+ USD) → motion `.npz`, logged to a W&B registry |
+| 3. Training | `scripts/rsl_rl/train_mimic_mesh.py` | motion `.npz` (from W&B) → trained expert policy |
+| 4. Evaluation | `scripts/rsl_rl/play_mimic_mesh_ref_viz.py` | policy checkpoint → reference-overlay visualization |
 
 ## Installation
 
@@ -32,8 +43,8 @@ This repository implements motion tracking over rough terrains for a Unitree G1 
 ### Clone the repository
 
 ```bash
-git clone git@github.com:sajelian/RT_IL.git
-cd RT_IL
+git clone git@github.com:leggedrobotics/terrain_imitation.git
+cd terrain_imitation
 ```
 
 ### Pull robot description assets from GCS
@@ -61,52 +72,70 @@ Activate the environment in any new terminal before running scripts:
 source env_isaaclab/bin/activate
 ```
 
-## Data Preparation
+## Weights & Biases setup
 
-### WandB setup
+Stages 2–4 use a [Weights & Biases](https://wandb.ai/) registry to store and retrieve the
+packaged motions. Log in (`wandb login`) and create a Registry collection named
+**Motions** (artifact type: *All Types*) under your entity. Wherever the docs use
+`<wandb-entity>`, substitute your own W&B entity (org or username).
 
-Log in to your WandB account and create a Registry collection named **Motions** (artifact type: *All Types*) under your organisation. Export your organisation name:
+## Stage 1 — Data preparation
+
+`scripts/prep_data.sh` turns a raw captured sequence into a retargeted trajectory CSV
+and a collision-ready terrain USD. Internally it runs: SMPL-X preparation → GMR
+retargeting → post-processing → terrain mesh extraction → mesh cutting → USD conversion.
 
 ```bash
-export WANDB_ENTITY=<your-org-name>
+bash scripts/prep_data.sh --motion-npz data/motions/raw/<sequence>.npz
 ```
 
-### Motion + terrain preprocessing pipeline
+The raw sequence `.npz` already embeds the scanned terrain (`scene_vertices`/`scene_faces`/…),
+so the mesh is extracted automatically. Pass `--mesh <terrain>.obj` to override it with an
+external mesh, or `--skip-mesh` to produce the trajectory only. Run
+`bash scripts/prep_data.sh --help` for all options (frame ranges, output dirs, etc.).
 
-`scripts/prep_data.sh` runs the full 5-step pipeline: SMPL-X preparation → GMR retargeting → post-processing → mesh cutting → USD conversion.
+**Prerequisites:**
+- The [GMR](https://github.com/sajelian/GMR) repo cloned with its conda environment set up
+  (follow the GMR README). Expected at `~/GMR` (or set `GMR_REPO=<path>`). The conda env
+  defaults to `gmr_custom` — if yours differs, edit `ENV_GMR` at the top of `scripts/prep_data.sh`.
+
+## Stage 2 — Motion packaging
+
+Convert the prepared trajectory CSV (and its terrain USD) into a motion `.npz` and log it
+to the W&B **Motions** registry:
 
 ```bash
-bash scripts/prep_data.sh \
-  --motion-npz data/motions/raw/<motion>.npz \
-  --mesh data/terrains/raw/<terrain>.obj
+python scripts/csv_to_npz_terrain.py \
+  --input_file data/motions/prepared/<sequence>_rt2g1_rdy.csv \
+  --output_name <motion_name> \
+  --usd_name <usd_mesh_name> \
+  --headless
 ```
 
-Run `bash scripts/prep_data.sh --help` for all options (frame ranges, output directories, skipping mesh, etc.).
-
-**Prerequisites for the pipeline:**
-- The [GMR](https://github.com/sajelian/GMR) repo must be cloned and its conda environment set up (follow the GMR README). The env is expected at `~/GMR` (or set `GMR_REPO=<path>`). The conda environment name defaults to `gmr_custom` — if yours differs, edit the `ENV_GMR` variable at the top of `scripts/prep_data.sh`
-- `IsaacLab/scripts/tools/convert_mesh.py` must be reachable at the path set in the script header.
-
-## Training Expert Policies
+## Stage 3 — Training expert policies
 
 ```bash
 python scripts/rsl_rl/train_mimic_mesh.py \
-  --registry_name <your-org>-org/wandb-registry-Motions/<motion_name> \
-  --usd_name <usd_mesh_name>
+  --registry_name <wandb-entity>/wandb-registry-Motions/<motion_name> \
+  --usd_name <usd_mesh_name> \
+  --num_envs 2048 --headless --logger wandb --log_project_name RT_IL
 ```
-## Policy Evaluation
+
+Use task `Tracking-Mesh-G1-v0` (default) for clean-sim training, or
+`Tracking-Mesh-Deploy-G1-v0` (`--task`) for the harder, sim-to-real-oriented variant with
+added perturbations and a noised height-scan.
+
+## Stage 4 — Policy evaluation
 
 ```bash
 python scripts/rsl_rl/play_mimic_mesh_ref_viz.py \
-  --registry_name <your-org>-org/wandb-registry-Motions/<motion_name> \
+  --registry_name <wandb-entity>/wandb-registry-Motions/<motion_name> \
   --usd_name <usd_mesh_name> \
   --num_envs 1
 ```
 
-## Rollout Collection (for Distillation)
+## Acknowledgements
 
-```bash
-python scripts/rsl_rl/collect_rollouts.py \
-  --registry_name <your-org>-org/wandb-registry-Motions/<motion_name> \
-  --usd_name <usd_mesh_name>
-```
+This project was originally built on top of [BeyondMimic](https://github.com/HybridRobotics/whole_body_tracking),
+which is licensed under the MIT License. The codebase has since been heavily modified.
+See `NOTICE.md` for the original license notice.

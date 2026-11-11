@@ -385,60 +385,6 @@ class ObservationsCfg_DEPLOY:
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
 
-@configclass
-class ObservationsCfg_DISTILLATION(ObservationsCfg_TRAIN):
-    """Observation specifications for the MDP."""
-
-    @configclass
-    class StudentPolicyCfg(ObsGroup):
-        """Observations for policy group."""
-
-        command = ObsTerm(
-            func=mdp.generated_commands, params={"command_name": "motion"}
-        )
-        motion_anchor_ori_b = ObsTerm(
-            func=mdp.motion_anchor_ori_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.05, n_max=0.05),
-            history_length=PROPIO_HISTORY_SHORT,
-        )
-        base_ang_vel = ObsTerm(
-            func=mdp.base_ang_vel,
-            scale=0.2,
-            noise=Unoise(n_min=-0.2, n_max=0.2),
-            history_length=PROPIO_HISTORY_LONG,
-        )
-        projected_gravity = ObsTerm(
-            func=mdp.projected_gravity,
-            noise=Unoise(n_min=-0.05, n_max=0.05),
-            history_length=PROPIO_HISTORY_SHORT,
-        )
-        joint_pos = ObsTerm(
-            func=mdp.joint_pos_rel,
-            noise=Unoise(n_min=-0.01, n_max=0.01),
-            history_length=PROPIO_HISTORY_LONG,
-        )
-        joint_vel = ObsTerm(
-            func=mdp.joint_vel_rel,
-            noise=Unoise(n_min=-0.5, n_max=0.5),
-            scale=0.05,
-            history_length=PROPIO_HISTORY_LONG,
-        )
-        actions = ObsTerm(func=mdp.last_action, history_length=PROPIO_HISTORY_SHORT)
-        height_scan = ObsTerm(
-            func=mdp.noised_height_scan,
-            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-            noise=Unoise(n_min=-0.1, n_max=0.1),
-            clip=(-1.0, 1.0)
-        )
-
-        def __post_init__(self):
-            self.enable_corruption = True
-            self.concatenate_terms = True
-
-    # observation groups
-    student: StudentPolicyCfg = StudentPolicyCfg()
-
 
 @configclass
 class EventCfg:

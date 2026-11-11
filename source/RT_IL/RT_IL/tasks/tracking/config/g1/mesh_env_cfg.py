@@ -7,7 +7,7 @@ from isaaclab.utils import configclass
 from isaaclab.managers import EventTermCfg as EventTerm
 
 from RT_IL.robots.g1 import G1_CYLINDER_CFG, G1_FOOT_LINKS, G1_HYBRID_ACTION_SCALE, G1_VIZ_CFG
-from RT_IL.tasks.tracking.tracking_env_cfg import ObservationsCfg_DISTILLATION, ObservationsCfg_DEPLOY, TrackingEnvCfg
+from RT_IL.tasks.tracking.tracking_env_cfg import ObservationsCfg_DEPLOY, TrackingEnvCfg
 from isaaclab.sensors.ray_caster import RayCasterCfg, MultiMeshRayCasterCfg
 
 
@@ -21,7 +21,7 @@ import RT_IL.tasks.tracking.mdp as mdp
 def _noised_mesh_scanner(
     resolution: float, size: list, pos: tuple = (0.0, 0.0, 20.0)
 ) -> NoisedMultiMeshRayCasterCfg:
-    """Build the NoisedMultiMeshRayCasterCfg used by deploy and distillation configs."""
+    """Build the NoisedMultiMeshRayCasterCfg used by the deploy config."""
     return NoisedMultiMeshRayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/torso_link",
         offset=RayCasterCfg.OffsetCfg(pos=pos),
@@ -101,7 +101,6 @@ class G1MeshEnvCfg(TrackingEnvCfg):
         ]
 
         self.scene.obstacle = self.obstacle
-        # self.commands.motion.class_type = FixedStartMotionCommand
 
 
 @configclass
@@ -110,14 +109,6 @@ class G1MimicMeshEnvCfg_PLAY(G1MeshEnvCfg):
         super().__post_init__()
         _configure_play_viewer(self)
         self.scene.height_scanner.debug_vis = True
-        # reduce termination thresholds to show failures more clearly
-        #self.terminations.anchor_pos = None
-        # self.terminations.anchor_ori = None
-        #self.terminations.ee_feet_pos = None
-        #self.terminations.ee_hand_pos = None
-        #self.events.push_robot = None
-        # self.commands.motion.start_xy_noise_std = 0.0
-        # self.episode_length_s = 7.0  # some motions are longer than default 10s
 
 
 @configclass
@@ -220,47 +211,9 @@ class G1MimicMeshEnvDeployCfg_PLAY(G1MeshEnvDeployCfg):
         super().__post_init__()
         _configure_play_viewer(self)
         self.scene.height_scanner.debug_vis = True
-        # reduce termination thresholds to show failures more clearly
-        # self.terminations.anchor_pos = None
+        # relax termination/perturbation so failures are easier to observe during playback
         self.events.foot_perturbation = None
-        # self.terminations.anchor_ori = None
         self.terminations.ee_feet_pos = None
         self.terminations.ee_hand_pos = None
         self.events.push_robot = None
-        # self.commands.motion.start_xy_noise_std = 0.0
         self.episode_length_s = 12.0  # some motions are longer than default 10s
-
-@configclass
-class G1MeshEnvCfg_DISTILLATION(G1MeshEnvCfg):
-
-    observations: ObservationsCfg_DISTILLATION = ObservationsCfg_DISTILLATION()
-
-    def __post_init__(self):
-        # post init of parent
-        super().__post_init__()
-
-        self.scene.height_scanner = _noised_mesh_scanner(
-            resolution=0.1, size=[1.6, 1.0]
-        )
-
-
-        # Uncomment to relax termination thresholds if the teacher policy is too strict for distillation.
-        # self.terminations.anchor_pos.params["threshold_xy"] = 1.0
-        # self.terminations.anchor_pos.params["threshold_z"] = 0.4
-
-
-@configclass
-class G1MeshEnvCfg_DISTILLATIONPLAY(G1MeshEnvCfg_DISTILLATION):
-
-    def __post_init__(self):
-        # post init of parent
-        super().__post_init__()
-
-        _configure_play_viewer(self)
-        self.commands.motion.debug_vis = False
-        self.commands.motion.start_xy_noise_std = 0.0
-        self.terminations.anchor_pos = None
-        self.terminations.anchor_ori = None
-        self.terminations.ee_feet_pos = None
-        self.terminations.ee_hand_pos = None
-        self.events.push_robot = None

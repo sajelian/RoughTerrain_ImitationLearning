@@ -1,26 +1,40 @@
-import trimesh
-import numpy as np
+"""Extract the terrain mesh embedded in a captured motion sequence into an OBJ file.
+
+The raw motion ``.npz`` stores the scanned scene geometry alongside the SMPL-X motion in
+the ``scene_vertices`` / ``scene_faces`` / ``scene_normals`` / ``scene_vertex_colors``
+arrays. This script writes that geometry out as a standalone OBJ.
+"""
+import argparse
 from pathlib import Path
 
-# load data
-data_path = Path("data/motions/raw/full_sequence-001.npz")
-data = np.load(data_path, allow_pickle=True)
+import numpy as np
+import trimesh
 
-# extract terrain mesh
-terrain_vertices = data["scene_vertices"]
-terrain_faces = data["scene_faces"]
-terrain_normals = data["scene_normals"]
-terrain_vertex_colors = data["scene_vertex_colors"]
 
-# create trimesh object
-terrain_mesh = trimesh.Trimesh(
-    vertices=terrain_vertices,
-    faces=terrain_faces,
-    vertex_normals=terrain_normals,
-    vertex_colors=terrain_vertex_colors,
-    process=False
-)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--motion-npz", type=Path, required=True, help="Raw motion .npz containing the scene_* arrays.")
+    parser.add_argument("--output-obj", type=Path, required=True, help="Destination OBJ path.")
+    return parser.parse_args()
 
-terrain_mesh.invert()
-terrain_mesh.export("data/terrains/raw/monday.obj")
-terrain_mesh.show()
+
+def main() -> None:
+    args = parse_args()
+    data = np.load(args.motion_npz, allow_pickle=True)
+
+    mesh = trimesh.Trimesh(
+        vertices=data["scene_vertices"],
+        faces=data["scene_faces"],
+        vertex_normals=data["scene_normals"],
+        vertex_colors=data["scene_vertex_colors"],
+        process=False,
+    )
+    mesh.invert()
+
+    args.output_obj.parent.mkdir(parents=True, exist_ok=True)
+    mesh.export(args.output_obj)
+    print(f"[INFO]: Terrain mesh written to {args.output_obj}")
+
+
+if __name__ == "__main__":
+    main()
